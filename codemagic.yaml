@@ -13,13 +13,21 @@ workflows:
           npm install --legacy-peer-deps
       - name: Fix Buggy React Native Scripts
         script: |
-          # Brute-force fix for Privacy Manifest script crash
+          # 1. Neutralize Privacy Manifest script crash
           SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
           if [ -f "$SCRIPT_PATH" ]; then
             echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed Buggy Script'; end; end" > "$SCRIPT_PATH"
           fi
           
-          # Fix execution permissions for all node_modules scripts
+          # 2. Fix Yoga.cpp compilation errors (Literal Operator Deprecation)
+          # This replaces "operator\"\" _pt" with "operator\"\"_pt" to satisfy newer Clang versions
+          YOGA_VALUE_H="node_modules/react-native/ReactCommon/yoga/yoga/YGValue.h"
+          if [ -f "$YOGA_VALUE_H" ]; then
+            sed -i '' 's/operator"" _/operator""_/g' "$YOGA_VALUE_H"
+            echo "Yoga literal operators fixed in $YOGA_VALUE_H"
+          fi
+
+          # 3. Fix execution permissions for all node_modules scripts
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
@@ -30,8 +38,7 @@ workflows:
           XCODE_SCHEME="Esimcampus"
           
           # ARCHIVE the app
-          # ENABLE_USER_SCRIPT_SANDBOXING=NO is critical for Xcode 15+ to allow Pods scripts to run
-          # OTHER_LDFLAGS="-Wl,-ld_classic" handles linker issues in Xcode 15+
+          # GCC_PREPROCESSOR_DEFINITIONS is used to suppress the C++ deprecation warnings in Yoga
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -44,6 +51,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
           mkdir -p build/ipa
