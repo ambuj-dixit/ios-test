@@ -2,8 +2,11 @@ require Pod::Executable.execute_command('node', ['-p',
   'require.resolve("react-native/scripts/react_native_pods.rb", {paths: [process.argv[1]]})',
   __dir__]).strip
 
-# Monkey-patch to fix a critical bug in React Native 0.72.17 scripts
-# that causes 'undefined method new_file' crashes during pod install.
+# IMPORTANT: We must load the utility file BEFORE we monkey-patch it,
+# otherwise its own definition will overwrite ours when required by RN scripts.
+buggy_utils_path = File.expand_path('../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', __dir__)
+require buggy_utils_path if File.exist?(buggy_utils_path)
+
 module PrivacyManifestUtils
   def self.add_aggregated_privacy_manifest(installer)
     Pod::UI.puts "[ESIM Fix] Bypassing buggy PrivacyManifestUtils to ensure build stability".yellow

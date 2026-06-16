@@ -11,10 +11,17 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
+      - name: Fix Buggy React Native Scripts
+        script: |
+          # Brute-force fix: Wipe the buggy script's contents before any Ruby code runs.
+          # This ensures that even if our Podfile monkey-patch fails, the code is empty.
+          SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
+          if [ -f "$SCRIPT_PATH" ]; then
+            echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed Buggy Script'; end; end" > "$SCRIPT_PATH"
+            echo "Buggy script at $SCRIPT_PATH has been neutralized."
+          fi
       - name: Install CocoaPods
         script: |
-          # Bypassing Bundler because the lockfile version (1.17.2) is incompatible 
-          # with modern Ruby versions where 'untaint' is removed.
           cd ios && pod install --repo-update
       - name: Build iOS App
         script: |
