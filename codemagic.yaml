@@ -13,15 +13,14 @@ workflows:
           npm install --legacy-peer-deps
       - name: Install CocoaPods
         script: |
-          bundle install
-          cd ios && bundle exec pod install --repo-update
+          # Bypassing Bundler because the lockfile version (1.17.2) is incompatible 
+          # with modern Ruby versions where 'untaint' is removed.
+          cd ios && pod install --repo-update
       - name: Build iOS App
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
-          # ARCHIVE the app (Required for App Store)
-          # We use -allowProvisioningUpdates in case you have connected your Apple ID to Codemagic
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -34,7 +33,6 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             COMPILER_INDEX_STORE_ENABLE=NO
           
-          # Prepare the .app for Codemagic artifacts (so you can see the build result)
           mkdir -p build/ipa
           cp -r build/Esimcampus.xcarchive/Products/Applications/*.app build/ipa/
     artifacts:
