@@ -26,20 +26,20 @@
 }
 
 
-// 🔐 SSL Pinning Bypass for Debug and Test builds
+// 🔐 SSL Pinning Bypass for Debug only
 - (void)URLSession:(NSURLSession *)session
         didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
         completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
 {
 #if DEBUG
-  // For Debug builds
+  // For Debug builds only, allow self-signed certificates
   completionHandler(NSURLSessionAuthChallengeUseCredential,
                     [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
 #else
-  // For TestFlight builds (non-App Store)
-  completionHandler(NSURLSessionAuthChallengeUseCredential,
-                    [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
+  // For Release/App Store builds, use default secure handling
+  completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
 #endif
 }
+
 
 @end
