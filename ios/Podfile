@@ -35,7 +35,8 @@ target 'Esimcampus' do
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false
+      :mac_catalyst_enabled => false,
+      :privacy_manifest_aggregation_enabled => false
     )
     # The automated aggregation is crashing due to a bug in the RN 0.72 scripts
     # when a manual PrivacyInfo.xcprivacy already exists.
