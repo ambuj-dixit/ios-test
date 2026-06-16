@@ -13,10 +13,11 @@ workflows:
           npm install --legacy-peer-deps
       - name: Install CocoaPods
         script: |
-          cd ios && pod install
+          # Use Bundler to ensure the exact CocoaPods version from your Gemfile is used
+          bundle install
+          cd ios && bundle exec pod install --repo-update
       - name: Build iOS App
         script: |
-          # Manually defining variables for maximum compatibility
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
