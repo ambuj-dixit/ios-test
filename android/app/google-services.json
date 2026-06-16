@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055786033213",
+    "project_id": "esim-campus-student",
+    "storage_bucket": "esim-campus-student.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055786033213:android:9c520ee552b49e8c214a54",
+        "android_client_info": {
+          "package_name": "com.mkt.studentportal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDC8qIwaB35CLhFjP0Onb4xGtpzoLOJ0yo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

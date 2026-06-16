@@ -1,0 +1,45 @@
+#import "AppDelegate.h"
+#import <Firebase.h>
+#import <React/RCTBundleURLProvider.h>
+
+@implementation AppDelegate
+
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
+{
+  self.moduleName = @"Esimcampus";
+  // You can add your custom initial props in the dictionary below.
+  // They will be passed down to the ViewController used by React Native.
+  self.initialProps = @{};
+  [FIRApp configure];
+
+
+  return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+- (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
+{
+#if DEBUG
+  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@"index"];
+#else
+  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+#endif
+}
+
+
+// 🔐 SSL Pinning Bypass for Debug and Test builds
+- (void)URLSession:(NSURLSession *)session
+        didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+        completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
+{
+#if DEBUG
+  // For Debug builds
+  completionHandler(NSURLSessionAuthChallengeUseCredential,
+                    [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
+#else
+  // For TestFlight builds (non-App Store)
+  completionHandler(NSURLSessionAuthChallengeUseCredential,
+                    [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust]);
+#endif
+}
+
+@end

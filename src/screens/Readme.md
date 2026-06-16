@@ -1,0 +1,1 @@
+This folder contains all the screens used in our app. The folder name represents the screen name and file with View contains all the view components and index.js contains all the side effects like API call, state management,etc.

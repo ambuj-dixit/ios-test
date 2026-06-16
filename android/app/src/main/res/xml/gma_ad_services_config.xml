@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ad-services-config>
+    <attestation-config>
+        <enrollment-id value="0"/>
+    </attestation-config>
+</ad-services-config>
