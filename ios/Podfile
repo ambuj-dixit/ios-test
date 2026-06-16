@@ -2,6 +2,14 @@ require Pod::Executable.execute_command('node', ['-p',
   'require.resolve("react-native/scripts/react_native_pods.rb", {paths: [process.argv[1]]})',
   __dir__]).strip
 
+# Monkey-patch to fix a critical bug in React Native 0.72.17 scripts
+# that causes 'undefined method new_file' crashes during pod install.
+module PrivacyManifestUtils
+  def self.add_aggregated_privacy_manifest(installer)
+    Pod::UI.puts "[ESIM Fix] Bypassing buggy PrivacyManifestUtils to ensure build stability".yellow
+  end
+end
+
 platform :ios, '15.0'
 use_modular_headers!
 # platform :ios, min_ios_version_supported
@@ -35,9 +43,20 @@ target 'Esimcampus' do
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      :privacy_manifest_aggregation_enabled => false
+      :mac_catalyst_enabled => false
     )
+
+    # World-Class Fixes for Build Stability
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # 1. Ensure all pods target iOS 15.0 to match the main project
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+
+        # 2. Fix for Xcode 15+ "Duplicate Symbols" in certain RN versions
+        config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
+      end
+    end
+
     # The automated aggregation is crashing due to a bug in the RN 0.72 scripts
     # when a manual PrivacyInfo.xcprivacy already exists.
     # We are using the manual file at ios/Esimcampus/PrivacyInfo.xcprivacy instead.
