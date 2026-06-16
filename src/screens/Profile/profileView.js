@@ -1,4 +1,11 @@
-import {Text, View, Image, StyleSheet, ScrollView} from 'react-native';
+import {
+  Text,
+  View,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
 import React, {Component} from 'react';
 import {
   maleProfile,
@@ -18,7 +25,7 @@ import {
 import styles from './styles';
 import {HeaderWithTitle} from '../../components';
 
-const Profile = ({profileData, navigation}) => {
+const Profile = ({profileData, navigation, onDeleteAccount}) => {
   return (
     <View style={styles.container}>
       {/* Profile card   */}
@@ -156,6 +163,19 @@ const Profile = ({profileData, navigation}) => {
             isLast={true} // Set this to true for the last card
           />
         </View>
+
+        <TouchableOpacity
+          onPress={onDeleteAccount}
+          style={{
+            margin: 20,
+            padding: 15,
+            backgroundColor: '#FF3B30',
+            borderRadius: 10,
+            alignItems: 'center',
+            marginBottom: 40,
+          }}>
+          <Text style={{color: 'white', fontWeight: 'bold'}}>Delete Account</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );

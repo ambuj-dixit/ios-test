@@ -1,6 +1,6 @@
 export default {
-  BASE_URL: 'http://182.18.162.129:105/Calender_details.asmx/',
-  INSTITUTE_BASE_URL: 'http://182.18.162.129:91/Calender_details.asmx/',
+  BASE_URL: 'https://182.18.162.129:105/Calender_details.asmx/',
+  INSTITUTE_BASE_URL: 'https://182.18.162.129:91/Calender_details.asmx/',
   appName: 'ESIM Campus Solution',
   routeNames: {
     CONSENT_FORM: 'consentForm',
