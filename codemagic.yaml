@@ -20,14 +20,18 @@ workflows:
           fi
           
           # 2. Fix Yoga.cpp compilation errors (Literal Operator Deprecation)
-          # This replaces "operator\"\" _pt" with "operator\"\"_pt" to satisfy newer Clang versions
           YOGA_VALUE_H="node_modules/react-native/ReactCommon/yoga/yoga/YGValue.h"
           if [ -f "$YOGA_VALUE_H" ]; then
-            sed -i '' 's/operator"" _/operator""_/g' "$YOGA_VALUE_H"
+            sed -i '' 's/operator"" _pt/operator""_pt/g' "$YOGA_VALUE_H"
+            sed -i '' 's/operator"" _percent/operator""_percent/g' "$YOGA_VALUE_H"
             echo "Yoga literal operators fixed in $YOGA_VALUE_H"
           fi
 
-          # 3. Fix execution permissions for all node_modules scripts
+          # 3. Remove problematic XML duplicate files in iOS folder
+          rm -f ios/Esimcampus/LaunchScreen.storyboard.xml
+          rm -f ios/Esimcampus/Esimcampus.entitlements.xml
+
+          # 4. Fix execution permissions for all node_modules scripts
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
@@ -38,7 +42,8 @@ workflows:
           XCODE_SCHEME="Esimcampus"
           
           # ARCHIVE the app
-          # GCC_PREPROCESSOR_DEFINITIONS is used to suppress the C++ deprecation warnings in Yoga
+          # GCC_PREPROCESSOR_DEFINITIONS: Suppress C++ deprecation warnings in Yoga and Folly
+          # OTHER_CPLUSPLUSFLAGS: Specifically target the literal operator error as a warning
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -51,7 +56,8 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
+            GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1" \
+            OTHER_CPLUSPLUSFLAGS="\$(inherited) -Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator" \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
           mkdir -p build/ipa
