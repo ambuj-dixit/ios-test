@@ -2,29 +2,22 @@ require Pod::Executable.execute_command('node', ['-p',
   'require.resolve("react-native/scripts/react_native_pods.rb", {paths: [process.argv[1]]})',
   __dir__]).strip
 
-# IMPORTANT: We must load the utility file BEFORE we monkey-patch it,
-# otherwise its own definition will overwrite ours when required by RN scripts.
+# World-Class Stability: Monkey-patch to fix a critical bug in React Native 0.72 scripts
+# that causes 'undefined method new_file' crashes during pod install.
 buggy_utils_path = File.expand_path('../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', __dir__)
 require buggy_utils_path if File.exist?(buggy_utils_path)
 
 module PrivacyManifestUtils
   def self.add_aggregated_privacy_manifest(installer)
-    Pod::UI.puts "[ESIM Fix] Bypassing buggy PrivacyManifestUtils to ensure build stability".yellow
+    Pod::UI.puts "[ESIM Fix] Bypassing buggy PrivacyManifestUtils for stability".yellow
   end
 end
 
 platform :ios, '15.0'
 use_modular_headers!
-# platform :ios, min_ios_version_supported
 
 prepare_react_native_project!
 $RNFirebaseAsStaticFramework = true
-
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
 
 target 'Esimcampus' do
   config = use_native_modules!
@@ -34,7 +27,6 @@ target 'Esimcampus' do
     :path => config[:reactNativePath],
     :hermes_enabled => flags[:hermes_enabled],
     :fabric_enabled => flags[:fabric_enabled],
-    # :flipper_configuration => flipper_config,
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
@@ -49,21 +41,42 @@ target 'Esimcampus' do
       :mac_catalyst_enabled => false
     )
 
-    # World-Class Fixes for Build Stability
+    # MASTER FIX: Unify all targets for modern Xcode (15/16)
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        # 1. Ensure all pods target iOS 15.0 to match the main project
+        # 1. Force iOS 15.0 deployment target
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
 
-        # 2. Fix for Xcode 15+ "Duplicate Symbols" in certain RN versions
+        # 2. Force C++17 to avoid removal of 'result_of' in C++20 (Fixes Folly)
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+
+        # 3. Suppress fatal errors for deprecated features
+        defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+        defs << '_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1'
+        defs << '_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+
+        # 4. Linker safety
         config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
       end
     end
 
-    # The automated aggregation is crashing due to a bug in the RN 0.72 scripts
-    # when a manual PrivacyInfo.xcprivacy already exists.
-    # We are using the manual file at ios/Esimcampus/PrivacyInfo.xcprivacy instead.
-    # privacy_manifest_utils.add_aggregated_privacy_manifest(installer)
+    # MASTER FIX: Seditious header patching for Yoga Literals
+    # This repairs the Yoga source code if it exists in the Pods directory
+    yoga_header = 'Pods/Target Support Files/Yoga/Yoga.h' # Secondary location check
+    # We also target the actual header in the Yoga pod
+    yoga_value_h = 'Pods/Yoga/yoga/YGValue.h'
+    [yoga_header, yoga_value_h].each do |header|
+      path = File.join(installer.sandbox.root, '..', 'ios', header)
+      if File.exist?(path)
+        contents = File.read(path)
+        if contents.include?('operator"" _')
+          Pod::UI.puts "[ESIM Fix] Patching Yoga literal operators in #{header}".green
+          contents.gsub!(/operator"" _/, 'operator""_')
+          File.open(path, 'w') { |f| f.write(contents) }
+        end
+      end
+    end
   end
 end
 

@@ -26,34 +26,22 @@ workflows:
             echo "Yoga literal operators fixed in $YOGA_VALUE_H"
           fi
 
-          # 3. Fix RCT-Folly result_of errors for C++20/Xcode 16
-          FOLLY_ASYNC_H="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
-          # (Note: This is applied after pod install in a real scenario, but we can also target node_modules if folly is there)
-          # However, RCT-Folly is usually downloaded during pod install into ios/Pods.
-          # So we will add a post-pod-install fix script.
-
-          # 4. Remove problematic XML duplicate files in iOS folder
+          # 3. Remove problematic XML duplicate files in iOS folder
           rm -f ios/Esimcampus/LaunchScreen.storyboard.xml
           rm -f ios/Esimcampus/Esimcampus.entitlements.xml
 
-          # 5. Fix execution permissions for all node_modules scripts
+          # 4. Fix execution permissions for all node_modules scripts
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
-      - name: Post-Pod-Install Fixes
-        script: |
-          # Fix VirtualEventBase.cpp in Pods if it exists (std::result_of is removed in C++20)
-          # We force it to use std::invoke_result or just suppress the error by forcing C++17 in xcodebuild
-          echo "Applying post-pod-install patches..."
       - name: Build iOS App
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
           # ARCHIVE the app
-          # CLANG_CXX_LANGUAGE_STANDARD=c++17: Forces the build to use C++17, which folly 2021 supports.
-          # GCC_PREPROCESSOR_DEFINITIONS: Suppress removed C++ features.
+          # Note: Most fixes are now embedded in the Podfile and Project file for maximum stability.
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -66,9 +54,6 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            CLANG_CXX_LANGUAGE_STANDARD="c++17" \
-            GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1 _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1" \
-            OTHER_CPLUSPLUSFLAGS="\$(inherited) -Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator -Wno-error=unused-command-line-argument" \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
           mkdir -p build/ipa
