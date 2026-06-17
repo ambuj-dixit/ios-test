@@ -70,4 +70,3 @@ workflows:
           cp -r build/Esimcampus.xcarchive/Products/Applications/*.app build/debug-app/
     artifacts:
       - build/debug-app/*.app
-
