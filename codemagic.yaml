@@ -66,4 +66,4 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration # Uses the API key configured in Codemagic
-        submit: false     # Set to true to automatically submit to TestFlight
+        submit_to_testflight: false # Set to true to automatically submit to TestFlight
