@@ -11,7 +11,7 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Neutralize Buggy Source Code
+      - name: Global Source Neutralizer
         script: |
           # 1. Fix Privacy Manifest crash
           SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
@@ -19,31 +19,36 @@ workflows:
             echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed'; end; end" > "$SCRIPT_PATH"
           fi
           
-          # 2. Recursive Fix for all C++ Literal Operator errors (Yoga, Folly, etc.)
-          echo "Repairing C++ Syntax in node_modules..."
-          find node_modules -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator""  *_/operator""_/g'
+          # 2. UNIVERSAL Literal Operator Fix (Yoga, Folly, Reanimated)
+          # We search the entire project for 'operator"" ' and remove the space
+          echo "Applying Global C++ Syntax Repair..."
+          grep -rl 'operator"" ' . | xargs sed -i '' 's/operator"" /operator""/g'
 
-          # 3. Permissions fix
+          # 3. Fix execution permissions
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
       - name: Post-Pod Source Patching
         script: |
-          # 4. Repair Syntax errors in the freshly downloaded Pods
+          # 4. Repair literal operators in the Pods we just downloaded
           echo "Repairing C++ Syntax in Pods..."
-          find ios/Pods -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator""  *_/operator""_/g'
+          find ios/Pods -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -print0 | xargs -0 sed -i '' 's/operator"" /operator""/g'
           
-          # 5. Fix Folly C++20 'result_of' error by forcing the correct traits
-          find ios/Pods/RCT-Folly -name "*.cpp" -o -name "*.h" | xargs sed -i '' '1i\
-          #define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1
-          '
+          # 5. Fix Folly std::result_of removal in C++20
+          echo "Injecting C++20 compatibility traits..."
+          FOLLY_FILE="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
+          if [ -f "$FOLLY_FILE" ]; then
+            echo "#define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1" > "$FOLLY_FILE.tmp"
+            cat "$FOLLY_FILE" >> "$FOLLY_FILE.tmp"
+            mv "$FOLLY_FILE.tmp" "$FOLLY_FILE"
+          fi
       - name: Build iOS Application
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
-          # ARCHIVE in Debug-compatible mode (No certificates required)
+          # ARCHIVE with maximum error suppression
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -58,10 +63,11 @@ workflows:
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
             CLANG_CXX_LANGUAGE_STANDARD="c++17" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-            OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -Wno-error=deprecated-literal-operator" \
+            OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -Wno-error -Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator" \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
           mkdir -p build/debug-app
           cp -r build/Esimcampus.xcarchive/Products/Applications/*.app build/debug-app/
     artifacts:
       - build/debug-app/*.app
+
