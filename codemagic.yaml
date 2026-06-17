@@ -16,6 +16,9 @@ workflows:
           npm install --legacy-peer-deps
       - name: Global Source Pre-Repair
         script: |
+          # 0. Force fresh dependencies by removing lockfiles
+          rm -f package-lock.json yarn.lock
+
           # 1. Fix Privacy Manifest crash
           SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
           if [ -f "$SCRIPT_PATH" ]; then
@@ -38,8 +41,8 @@ workflows:
         script: |
           echo "Executing Nuclear C++ Repair on Pods (v2)..."
           # Fix for std::result_of removal in C++20 - Targeting ALL C++ and Objective-C++ files
-          find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/std::result_of/std::invoke_result/g' || true
-          find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/result_of_t/invoke_result_t/g' || true
+          find ios/Pods node_modules/react-native-date-picker -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/std::result_of/std::invoke_result/g' || true
+          find ios/Pods node_modules/react-native-date-picker -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/result_of_t/invoke_result_t/g' || true
           
           # Inject compatibility macros into all Pods PCH files
           find ios/Pods -name "*.pch" -exec sed -i '' '1i\
