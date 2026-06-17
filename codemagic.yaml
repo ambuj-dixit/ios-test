@@ -16,18 +16,17 @@ workflows:
           npm install --legacy-peer-deps
       - name: Surgical Source Repair
         script: |
-          # 1. Force patch react-native-date-picker using safe string replacement
           echo "Executing Surgical Repair on Date Picker..."
           DP_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
           if [ -f "$DP_FILE" ]; then
-            # Fix UIControlEvents casting error
+            # Fix UIControlEvents casting error safely
             sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' "$DP_FILE"
-            
-            # Inject required headers at the top if they don't exist
-            grep -q "UIKit/UIKit.h" "$DP_FILE" || sed -i '' '1i\
-            #import <UIKit/UIKit.h>\
-            #import <React/RCTLog.h>\
-            ' "$DP_FILE"
+          
+            # Bulletproof Header Injection for macOS BSD Environment
+            if ! grep -q "UIKit/UIKit.h" "$DP_FILE"; then
+              echo "Injecting UIKit headers..."
+              echo -e "#import <UIKit/UIKit.h>\n#import <React/RCTLog.h>\n$(cat "$DP_FILE")" > "$DP_FILE"
+            fi
           fi
 
           # 2. Fix React Native scripts
@@ -49,7 +48,7 @@ workflows:
           find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/std::result_of/std::invoke_result/g' || true
           find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/result_of_t/invoke_result_t/g' || true
           
-          # Patch project for bundle sync
+          # Patch project for bundle sync and compiler suppression overrides
           ruby -e "
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
@@ -58,6 +57,7 @@ workflows:
               config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
               config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
               config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+              config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
               config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.mkt.studentportal' if target.name == 'Esimcampus'
             end
           end
