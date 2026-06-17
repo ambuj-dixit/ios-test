@@ -18,7 +18,7 @@ use_modular_headers!
 prepare_react_native_project!
 $RNFirebaseAsStaticFramework = true
 
-# Define config globally to fix the 'undefined local variable' error
+# Define config globally
 global_config = use_native_modules!
 
 target 'Esimcampus' do
@@ -49,10 +49,10 @@ post_install do |installer|
   )
 
   installer.pods_project.targets.each do |target|
-    # DEDUPLICATION FIX: Fix for 'Multiple commands produce AccessibilityResources.bundle'
+    # DEDUPLICATION: Fix for 'Multiple commands produce AccessibilityResources.bundle'
     if target.name.include?('AccessibilityResources')
       target.build_configurations.each do |config|
-        config.build_settings['PRODUCT_NAME'] = "AccessibilityResources-#{target.name}"
+        config.build_settings['SKIP_INSTALL'] = 'YES'
       end
     end
 
@@ -71,6 +71,9 @@ post_install do |installer|
       defs << '_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
       defs << '_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1'
       build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+
+      # Linker stability
+      build_config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
     end
   end
 end
