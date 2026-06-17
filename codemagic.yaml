@@ -2,7 +2,7 @@ workflows:
   ios-release:
     name: ESIM Campus iOS Release Build
     max_build_duration: 60
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     environment:
       node: 18
       xcode: latest
@@ -18,42 +18,31 @@ workflows:
           if [ -f "$SCRIPT_PATH" ]; then
             echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed Buggy Script'; end; end" > "$SCRIPT_PATH"
           fi
-          # 2. Fix Yoga.cpp compilation errors (Literal Operator Deprecation)
-          YOGA_VALUE_H="node_modules/react-native/ReactCommon/yoga/yoga/YGValue.h"
-          if [ -f "$YOGA_VALUE_H" ]; then
-            sed -i '' 's/operator"" _pt/operator""_pt/g' "$YOGA_VALUE_H"
-            sed -i '' 's/operator"" _percent/operator""_percent/g' "$YOGA_VALUE_H"
-            echo "Yoga literal operators fixed in $YOGA_VALUE_H"
-          fi
+          
+          # 2. Global Literal Operator Fix (Yoga, Folly, etc.)
+          # Recursively fixes operator"" _pt, _sp, _percent, etc.
+          echo "Repairing C++ literal operators in node_modules..."
+          find node_modules -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator"" _/operator""_/g'
 
-          # 3. Remove problematic XML duplicate files in iOS folder
-          rm -f ios/Esimcampus/LaunchScreen.storyboard.xml
-          rm -f ios/Esimcampus/Esimcampus.entitlements.xml
-
-          # 4. Fix execution permissions for all node_modules scripts
+          # 3. Fix execution permissions
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
       - name: Post-Pod-Install Fixes
         script: |
-          # Robust fix for RCT-Folly VirtualEventBase.cpp (std::result_of is removed in C++20)
-          # We force it to use C++20 compatible traits if C++17 isn't picked up by the compiler
-          FOLLY_FILE="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
-          if [ -f "$FOLLY_FILE" ]; then
-            # Prepend the macro to enable removed traits in newer Clang/C++ versions
-            echo "#define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1" > "$FOLLY_FILE.tmp"
-            cat "$FOLLY_FILE" >> "$FOLLY_FILE.tmp"
-            mv "$FOLLY_FILE.tmp" "$FOLLY_FILE"
-            echo "Patched $FOLLY_FILE with C++20 compatibility macro"
-          fi
+          # 4. Repair literal operators that were just downloaded into Pods
+          echo "Repairing C++ literal operators in Pods..."
+          find ios/Pods -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator"" _/operator""_/g'
       - name: Build iOS App
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
-          # ARCHIVE the app
-          # Note: Most fixes are now embedded in the Podfile and Project file for maximum stability.
+          # Force clean build to prevent cached error headers
+          xcodebuild clean -workspace "$XCODE_WORKSPACE" -scheme "$XCODE_SCHEME" -configuration Release
+          
+          # ARCHIVE the app with Master Flags
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -66,7 +55,10 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             COMPILER_INDEX_STORE_ENABLE=NO \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
+            CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+            GCC_PREPROCESSOR_DEFINITIONS="\$(inherited) _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1 _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1" \
+            OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS="DEBUG"
           
           mkdir -p build/ipa
           cp -r build/Esimcampus.xcarchive/Products/Applications/*.app build/ipa/

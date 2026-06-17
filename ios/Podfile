@@ -43,20 +43,24 @@ target 'Esimcampus' do
 
     # MASTER FIX: Unify all targets for modern Xcode (15/16)
     installer.pods_project.targets.each do |target|
+      # Suppress all warnings for third-party pods to prevent -Werror crashes
+      target.root_spec.compiler_flags = '-w' if target.respond_to?(:root_spec)
+
       target.build_configurations.each do |config|
         # 1. Force iOS 15.0 deployment target
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
 
-        # 2. Force C++17 to avoid removal of 'result_of' in C++20 (Fixes Folly)
+        # 2. Force C++17
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
 
-        # 3. Suppress fatal errors for deprecated features
+        # 3. Master Preprocessor Flags
         defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
         defs << '_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1'
         defs << '_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
 
-        # 4. Linker safety
+        # 4. Suppress fatal errors
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
         config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
       end
     end
