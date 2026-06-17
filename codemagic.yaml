@@ -1,69 +1,67 @@
 workflows:
-  ios-app-store:
-    name: ESIM Campus iOS App Store Release
+  ios-debug:
+    name: ESIM Campus iOS Hyper-Stable Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 18
       xcode: latest
       cocoapods: default
-      groups:
-        - apple_auth # Requires you to set up Apple API key in Codemagic UI
     scripts:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Fix Buggy React Native Scripts
+      - name: Neutralize Buggy Source Code
         script: |
-          # 1. Neutralize Privacy Manifest script crash
+          # 1. Fix Privacy Manifest crash
           SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
           if [ -f "$SCRIPT_PATH" ]; then
-            echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed Buggy Script'; end; end" > "$SCRIPT_PATH"
+            echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed'; end; end" > "$SCRIPT_PATH"
           fi
           
-          # 2. Global Literal Operator Fix
-          find node_modules -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator"" _/operator""_/g'
+          # 2. Recursive Fix for all C++ Literal Operator errors (Yoga, Folly, etc.)
+          echo "Repairing C++ Syntax in node_modules..."
+          find node_modules -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator""  *_/operator""_/g'
 
-          # 3. Script permissions
+          # 3. Permissions fix
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
-      - name: Post-Pod-Install Fixes
+      - name: Post-Pod Source Patching
         script: |
-          # 4. Repair literal operators in Pods
-          find ios/Pods -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator"" _/operator""_/g'
+          # 4. Repair Syntax errors in the freshly downloaded Pods
+          echo "Repairing C++ Syntax in Pods..."
+          find ios/Pods -name "*.h" -o -name "*.cpp" -o -name "*.hpp" | xargs sed -i '' 's/operator""  *_/operator""_/g'
           
-          # 5. Fix RCT-Folly C++ Compatibility
-          FOLLY_FILE="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
-          if [ -f "$FOLLY_FILE" ]; then
-            echo "#define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1" > "$FOLLY_FILE.tmp"
-            cat "$FOLLY_FILE" >> "$FOLLY_FILE.tmp"
-            mv "$FOLLY_FILE.tmp" "$FOLLY_FILE"
-          fi
-      - name: Set up Code Signing
-        script: |
-          # This command automatically fetches profiles from Apple Developer Portal
-          # Note: Requires App Store Connect API Key configured in Codemagic
-          keychain initialize
-          app-store-connect fetch-signing-files "com.mkt.studentportal" --type IOS_APP_STORE --create
-          keychain add-certificates
-          xcode-project use-profiles
-      - name: Build iOS App (.ipa)
+          # 5. Fix Folly C++20 'result_of' error by forcing the correct traits
+          find ios/Pods/RCT-Folly -name "*.cpp" -o -name "*.h" | xargs sed -i '' '1i\
+          #define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1
+          '
+      - name: Build iOS Application
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
           XCODE_SCHEME="Esimcampus"
           
-          # ARCHIVE AND EXPORT IPA
-          # We use xcode-project build-ipa for a reliable production export
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME" \
-            --configuration Release \
-            --archive-flags "CLANG_CXX_LANGUAGE_STANDARD=c++17 GCC_PREPROCESSOR_DEFINITIONS='\$(inherited) _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1 _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1' ENABLE_USER_SCRIPT_SANDBOXING=NO OTHER_LDFLAGS='\$(inherited) -Wl,-ld_classic'"
+          # ARCHIVE in Debug-compatible mode (No certificates required)
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/Esimcampus.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_STYLE=Manual \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
+            OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -Wno-error=deprecated-literal-operator" \
+            OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
+          
+          mkdir -p build/debug-app
+          cp -r build/Esimcampus.xcarchive/Products/Applications/*.app build/debug-app/
     artifacts:
-      - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        auth: integration # Uses the API key configured in Codemagic
-        submit_to_testflight: false # Set to true to automatically submit to TestFlight
+      - build/debug-app/*.app
