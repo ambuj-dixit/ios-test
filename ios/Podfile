@@ -52,7 +52,7 @@ post_install do |installer|
     # DEDUPLICATION: Fix for 'Multiple commands produce AccessibilityResources.bundle'
     if target.name.include?('AccessibilityResources')
       target.build_configurations.each do |config|
-        config.build_settings['PRODUCT_NAME'] = target.name
+        config.build_settings['PRODUCT_NAME'] = target.name.gsub(/[.-]/, '_')
         config.build_settings['SKIP_INSTALL'] = 'YES'
       end
     end
@@ -61,7 +61,7 @@ post_install do |installer|
       # Force iOS 15.0
       build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
 
-      # Force C++17 to avoid removal of 'result_of' in C++20
+      # Force C++17
       build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
 
       # Suppress all warnings
