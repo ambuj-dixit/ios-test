@@ -2,7 +2,7 @@ require Pod::Executable.execute_command('node', ['-p',
   'require.resolve("react-native/scripts/react_native_pods.rb", {paths: [process.argv[1]]})',
   __dir__]).strip
 
-# Fix for a critical bug in React Native 0.72 privacy manifest scripts
+# Fix for React Native 0.72 privacy manifest scripts
 buggy_utils_path = File.expand_path('../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', __dir__)
 require buggy_utils_path if File.exist?(buggy_utils_path)
 
@@ -18,7 +18,6 @@ use_modular_headers!
 prepare_react_native_project!
 $RNFirebaseAsStaticFramework = true
 
-# Define config globally
 global_config = use_native_modules!
 
 target 'Esimcampus' do
@@ -40,7 +39,6 @@ target 'OneSignalNotificationServiceExtension' do
   pod 'OneSignalXCFramework', '>= 3.0', '< 5.0'
 end
 
-# PERMANENT ROOT-LEVEL FIX FOR ALL PODS
 post_install do |installer|
   react_native_post_install(
     installer,
@@ -48,42 +46,26 @@ post_install do |installer|
     :mac_catalyst_enabled => false
   )
 
+  # THE OMEGA DEDUPLICATION: Remove the duplicate AccessibilityResources target
   installer.pods_project.targets.each do |target|
-    # 1. DEDUPLICATION: Fix for 'Multiple commands produce AccessibilityResources.bundle'
-    if target.name.include?('AccessibilityResources')
-      target.build_configurations.each do |config|
-        config.build_settings['PRODUCT_NAME'] = target.name.gsub(/[.-]/, '_')
-        config.build_settings['SKIP_INSTALL'] = 'YES'
-      end
+    if target.name == 'React-Core.common-CoreModulesHeaders-AccessibilityResources'
+        Pod::UI.puts "[ESIM Fix] Destroying duplicate bundle target: #{target.name}".red
+        target.remove_from_project
     end
+  end
 
-    # 2. SPECIFIC FIX: Force react-native-date-picker to ignore all errors and warnings
-    if target.name.include?('react-native-date-picker')
-      target.build_configurations.each do |config|
-        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-        config.build_settings['OTHER_CFLAGS'] = '$(inherited) -w'
-        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) -w'
-      end
-    end
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
 
-    target.build_configurations.each do |build_config|
-      # Force iOS 15.0
-      build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-
-      # Force C++17
-      build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
-
-      # Suppress all warnings globally
-      build_config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-
-      # Inject C++20 compatibility traits for Folly/Yoga/etc
-      defs = build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+      defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
       defs << '_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
       defs << '_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1'
-      build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
-
-      # Linker stability
-      build_config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+      config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
+      config.build_settings['OTHER_CFLAGS'] = '$(inherited) -w'
     end
   end
 end

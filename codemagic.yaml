@@ -1,6 +1,6 @@
 workflows:
   ios-preview:
-    name: ESIM Campus iOS World-Class Build
+    name: ESIM Campus iOS Omega Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -14,115 +14,51 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Global Source Surgery (Pre-Pod)
+      - name: Global Source Pre-Repair
         script: |
-          # 1. Fix Privacy Manifest crash
+          # 1. Force fix Date Picker source code (Clang Compatibility)
+          echo "Surgically patching RNDatePickerManager.mm..."
+          DP_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
+          if [ -f "$DP_FILE" ]; then
+            # Fix UIControlEvents casting
+            sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' "$DP_FILE"
+            # Ensure proper headers are imported
+            sed -i '' '1i\
+            #import <UIKit/UIKit.h>\
+            #import <React/RCTLog.h>\
+            ' "$DP_FILE"
+          fi
+
+          # 2. Fix Privacy Manifest crash
           SCRIPT_PATH="node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb"
           if [ -f "$SCRIPT_PATH" ]; then
             echo "module PrivacyManifestUtils; def self.add_aggregated_privacy_manifest(installer); puts '[ESIM Fix] Bypassed'; end; end" > "$SCRIPT_PATH"
           fi
           
-          # 2. Universal Literal Operator Fix
+          # 3. Fix C++ syntax errors globally
           find . -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/operator"" /operator""/g' || true
 
-          # 3. Aggressive XML/Storyboard Cleanup
-          echo "Cleaning storyboards and stray XMLs..."
+          # 4. Purge XML files that cause archive failures
           find . -name "*.storyboard.xml" -delete || true
           find ios/Esimcampus -name "*.xml" -delete || true
-          
-          # 4. Patch react-native-date-picker source code safely via Ruby
-          # This handles type-casting errors in modern Clang
-          ruby -e '
-          file_path = "node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
-          if File.exist?(file_path)
-            content = File.read(file_path)
-            # Add missing headers if not present
-            unless content.include?("<UIKit/UIKit.h>")
-              content = "#import <UIKit/UIKit.h>\n" + content
-            end
-            # Fix UIControlEvents casting
-            content.gsub!("UIControlEventValueChanged", "(UIControlEvents)UIControlEventValueChanged")
-            File.write(file_path, content)
-            puts "Successfully patched RNDatePickerManager.mm"
-          end
-          '
-
-          # 5. Fix permissions
-          find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
-      - name: Deep Pod Repair (Source Patching)
+      - name: Post-Pod Surgery
         script: |
-          # 6. Inject C++ Traits into every Pod Header
-          find ios/Pods -name "*.h" -o -name "*.hpp" -exec sed -i '' '1i\
-          #define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1\
-          #define _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION 1\
-          ' {} + || true
-
-          # 7. Specific fix for Folly VirtualEventBase
-          FOLLY_FIX="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
-          if [ -f "$FOLLY_FIX" ]; then
-            sed -i '' '1i\
-            #define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1\
-            ' "$FOLLY_FIX"
-          fi
-
-          # 8. Resolve React-Core header duplication
-          find ios/Pods -name "React-Core.podspec" -exec sed -i '' 's/header_dir = \"React\"/header_dir = \"ReactCore\"/g' {} + || true
-      - name: Xcode Project Harmonization
-        script: |
-          # 9. Unify all targets and FIX BUNDLE COLLISIONS
-          echo "Harmonizing Xcode Project..."
-          ruby -e "
-          require 'xcodeproj'
-          project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
-          bundle_id = 'com.mkt.studentportal'
+          # 5. Fix std::result_of removal in C++20 for all Pods
+          find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/std::result_of/std::invoke_result/g' || true
+          find ios/Pods -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/result_of_t/invoke_result_t/g' || true
           
-          project.targets.each do |target|
-            # REMOVE XML/Storyboard.xml from project sources/resources
-            target.build_phases.each do |phase|
-              phase.files.to_a.each do |file_ref|
-                if file_ref.file_ref && file_ref.file_ref.path && (file_ref.file_ref.path.include?('.xml') || file_ref.file_ref.path.include?('.storyboard.xml'))
-                  phase.remove_build_file(file_ref)
-                end
-              end
-            end
-
-            target.build_configurations.each do |config|
-              config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
-              config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-              config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-              config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-              config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-              config.build_settings['CODE_SIGN_STYLE'] = 'Manual'
-              config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = target.name == 'Esimcampus' ? bundle_id : \"#{bundle_id}.#{target.name}\"
-            end
-          end
-          project.save
-
-          # Fix Pods Project for AccessibilityResources collision
-          if File.exist?('ios/Pods/Pods.xcodeproj')
-            pods_project = Xcodeproj::Project.open('ios/Pods/Pods.xcodeproj')
-            pods_project.targets.each do |target|
-              if target.name.include?('AccessibilityResources')
-                target.build_configurations.each do |config|
-                  config.build_settings['PRODUCT_NAME'] = target.name.gsub(/[.-]/, '_')
-                  config.build_settings['SKIP_INSTALL'] = 'YES'
-                end
-              end
-              target.build_configurations.each do |config|
-                config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
-                config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['\$(inherited)']
-                config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << '_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
-              end
-            end
-            pods_project.save
-          end
-          "
-      - name: Build iOS Application (Preview Mode)
+          # 6. Resolve header collisions in React-Core
+          find ios/Pods -name "React-Core.podspec" -exec sed -i '' 's/header_dir = \"React\"/header_dir = \"ReactCore\"/g' {} + || true
+      - name: Build iOS Application (Omega Mode)
         script: |
-          # Final build command with maximum stability flags
+          echo "Starting Omega xcodebuild..."
+          
+          # Force clean any existing intermediate bundles to stop 'Multiple commands produce'
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -137,15 +73,15 @@ workflows:
             OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1" \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
-          # Packaging the IPA
+          # Packaging
           mkdir -p build/ios/ipa
-          if [ -d \"build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app\" ]; then
+          if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
             mkdir Payload
             cp -r Esimcampus.app Payload/
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
           else
-            echo \"ERROR: App binary not found. Build likely failed.\"
+            echo "OMEGA ERROR: App binary not found. Check build logs above."
             exit 1
           fi
     artifacts:
