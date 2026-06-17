@@ -26,14 +26,17 @@ workflows:
           echo "Repairing C++ Syntax..."
           find . -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/operator"" /operator""/g' || true
 
-          # 3. Fix execution permissions
+          # 3. Remove stray XML files that confuse Xcode
+          rm -f ios/Esimcampus/*.xml
+
+          # 4. Fix execution permissions
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
       - name: Xcode Project Patching (Bypass Signing & Linker Errors)
         script: |
-          # 4. Use Ruby to fix Project Settings and Bundle IDs
+          # 5. Use Ruby to fix Project Settings and Bundle IDs
           ruby -e "
           require 'xcodeproj'
           project_path = 'ios/Esimcampus.xcodeproj'
@@ -41,12 +44,14 @@ workflows:
           
           # Fix Main Target
           main_target = project.targets.find { |t| t.name == 'Esimcampus' }
-          main_bundle_id = ''
+          main_bundle_id = 'com.mkt.studentportal'
+          
           main_target.build_configurations.each do |config|
             config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
             config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-            config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks']
-            main_bundle_id = config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] || 'com.mkt.studentportal'
+            config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = ['\$(inherited)', '@executable_path/Frameworks']
+            # Force production bundle ID for preview
+            config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = main_bundle_id
           end
 
           # Fix Extension Target Bundle ID (Must be sub-domain of main)
@@ -55,16 +60,7 @@ workflows:
             ext_target.build_configurations.each do |config|
               config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = \"#{main_bundle_id}.OneSignalExtension\"
               config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-            end
-          end
-
-          # Add Missing Resource Files (GoogleService-Info.plist)
-          ['GoogleService-Info.plist'].each do |file|
-            unless project.files.find { |f| f.path == file }
-              puts \"Linking #{file}...\"
-              group = project.main_group.find_subpath('Esimcampus', true)
-              file_ref = group.new_reference(file)
-              main_target.add_resources([file_ref])
+              config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
             end
           end
 
@@ -73,12 +69,12 @@ workflows:
 
       - name: Post-Pod Deep Patching
         script: |
-          # 5. Fix Folly C++20 compatibility
+          # 6. Fix Folly C++20 compatibility
           find ios/Pods/RCT-Folly -name "*.cpp" -exec sed -i '' '1i\
           #define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1\
           ' {} + || true
 
-          # 6. Fix duplicate symbol issues in React-Core
+          # 7. Fix duplicate symbol issues in React-Core
           find ios/Pods -name "React-Core.podspec" -exec sed -i '' 's/header_dir = \"React\"/header_dir = \"ReactCore\"/g' {} + || true
       - name: Build iOS Application (Preview Mode)
         script: |
@@ -101,9 +97,14 @@ workflows:
           
           # Create an unsigned IPA for preview
           mkdir -p build/ios/ipa
-          cd build/Esimcampus.xcarchive/Products/Applications
-          mkdir Payload
-          cp -r Esimcampus.app Payload/
-          zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
+          if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
+            cd build/Esimcampus.xcarchive/Products/Applications
+            mkdir Payload
+            cp -r Esimcampus.app Payload/
+            zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
+          else
+            echo "Build failed - App binary not found!"
+            exit 1
+          fi
     artifacts:
       - build/ios/ipa/*.ipa
