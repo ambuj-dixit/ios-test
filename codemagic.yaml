@@ -25,20 +25,27 @@ workflows:
           # 2. Universal Literal Operator Fix
           find . -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.m" -o -name "*.mm" \) -print0 | xargs -0 sed -i '' 's/operator"" /operator""/g' || true
 
-          # 3. Aggressive XML Purge
+          # 3. Aggressive XML/Storyboard Cleanup
+          echo "Cleaning storyboards and stray XMLs..."
           find . -name "*.storyboard.xml" -delete || true
           find ios/Esimcampus -name "*.xml" -delete || true
           
-          # 4. Patch react-native-date-picker for Xcode 15/16
-          echo "Patching react-native-date-picker..."
-          DATE_PICKER_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
-          if [ -f "$DATE_PICKER_FILE" ]; then
-            sed -i '' '1i\
-            #import <React/RCTLog.h>\
-            #import <UIKit/UIKit.h>\
-            ' "$DATE_PICKER_FILE"
-            sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' "$DATE_PICKER_FILE" || true
-          fi
+          # 4. Patch react-native-date-picker source code safely via Ruby
+          # This handles type-casting errors in modern Clang
+          ruby -e '
+          file_path = "node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
+          if File.exist?(file_path)
+            content = File.read(file_path)
+            # Add missing headers if not present
+            unless content.include?("<UIKit/UIKit.h>")
+              content = "#import <UIKit/UIKit.h>\n" + content
+            end
+            # Fix UIControlEvents casting
+            content.gsub!("UIControlEventValueChanged", "(UIControlEvents)UIControlEventValueChanged")
+            File.write(file_path, content)
+            puts "Successfully patched RNDatePickerManager.mm"
+          end
+          '
 
           # 5. Fix permissions
           find node_modules -type f -name "*.sh" -exec chmod +x {} +
@@ -65,18 +72,18 @@ workflows:
           find ios/Pods -name "React-Core.podspec" -exec sed -i '' 's/header_dir = \"React\"/header_dir = \"ReactCore\"/g' {} + || true
       - name: Xcode Project Harmonization
         script: |
-          # 9. Unify all targets using Ruby and FIX BUNDLE COLLISIONS
-          echo "Harmonizing Xcode Project and fixing bundle collisions..."
+          # 9. Unify all targets and FIX BUNDLE COLLISIONS
+          echo "Harmonizing Xcode Project..."
           ruby -e "
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
           bundle_id = 'com.mkt.studentportal'
           
           project.targets.each do |target|
-            # CLEAN XML references from project
+            # REMOVE XML/Storyboard.xml from project sources/resources
             target.build_phases.each do |phase|
               phase.files.to_a.each do |file_ref|
-                if file_ref.file_ref && file_ref.file_ref.path && file_ref.file_ref.path.include?('.xml')
+                if file_ref.file_ref && file_ref.file_ref.path && (file_ref.file_ref.path.include?('.xml') || file_ref.file_ref.path.include?('.storyboard.xml'))
                   phase.remove_build_file(file_ref)
                 end
               end
@@ -127,18 +134,18 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CLANG_CXX_LANGUAGE_STANDARD="c++17" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-            OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -Wno-error -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1" \
+            OTHER_CPLUSPLUSFLAGS="\$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1" \
             OTHER_LDFLAGS="\$(inherited) -Wl,-ld_classic"
           
           # Packaging the IPA
           mkdir -p build/ios/ipa
-          if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
+          if [ -d \"build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app\" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
             mkdir Payload
             cp -r Esimcampus.app Payload/
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
           else
-            echo "ERROR: App binary not found. Build likely failed."
+            echo \"ERROR: App binary not found. Build likely failed.\"
             exit 1
           fi
     artifacts:
