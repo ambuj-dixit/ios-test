@@ -35,6 +35,18 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
+      - name: Post-Pod-Install Fixes
+        script: |
+          # Robust fix for RCT-Folly VirtualEventBase.cpp (std::result_of is removed in C++20)
+          # We force it to use C++20 compatible traits if C++17 isn't picked up by the compiler
+          FOLLY_FILE="ios/Pods/RCT-Folly/folly/io/async/VirtualEventBase.cpp"
+          if [ -f "$FOLLY_FILE" ]; then
+            # Prepend the macro to enable removed traits in newer Clang/C++ versions
+            echo "#define _LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS 1" > "$FOLLY_FILE.tmp"
+            cat "$FOLLY_FILE" >> "$FOLLY_FILE.tmp"
+            mv "$FOLLY_FILE.tmp" "$FOLLY_FILE"
+            echo "Patched $FOLLY_FILE with C++20 compatibility macro"
+          fi
       - name: Build iOS App
         script: |
           XCODE_WORKSPACE="ios/Esimcampus.xcworkspace"
