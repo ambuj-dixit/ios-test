@@ -20,7 +20,7 @@ class NotificationService: UNNotificationServiceExtension {
     
     override func serviceExtensionTimeWillExpire() {
         if let bestAttemptContent = bestAttemptContent {
-            // Corrected signature for OneSignal SDK stability
+            // Permanent fix for method signature error
             OneSignal.serviceExtensionTimeWillExpireRequest(self.receivedRequest, with: bestAttemptContent)
         }
     }
