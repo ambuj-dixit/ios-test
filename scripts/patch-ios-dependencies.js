@@ -1,96 +1,82 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Executing Professional iOS Dependency Optimization (v6)...');
+/**
+ * patch-ios-dependencies.js
+ *
+ * World-Class Infrastructure Patch for React Native 0.72.x
+ * Resolves C++ standards compliance issues for modern Clang (Xcode 15/16/17+).
+ *
+ * This script surgically updates the Yoga layout engine to handle strict C++20/C++26
+ * rules regarding missing standard headers and implicit structural initializers.
+ */
+
+console.log('🚀 Starting Infrastructure Patch: Yoga C++ Standards Compliance...');
 
 /**
- * Surgically patches a file with provided replacements.
+ * Surgically patches a file with a set of replacements.
+ * @param {string} relativePath - Path relative to project root.
+ * @param {Array<{target: string, replacement: string, check?: string}>} patches
  */
-function patchFile(filePath, replacements) {
-  const fullPath = path.join(process.cwd(), filePath);
-  if (!fs.existsSync(fullPath)) {
-    console.log(`⚠️  File not found (Skipping): ${filePath}`);
+function applySurgicalPatch(relativePath, patches) {
+  const absolutePath = path.join(process.cwd(), relativePath);
+
+  if (!fs.existsSync(absolutePath)) {
+    console.log(`⚠️  File not found (skipping): ${relativePath}`);
     return;
   }
 
-  let content = fs.readFileSync(fullPath, 'utf8');
+  let content = fs.readFileSync(absolutePath, 'utf8');
   let originalContent = content;
+  let appliedCount = 0;
 
-  replacements.forEach(replacement => {
-    if (replacement.check && content.includes(replacement.check)) {
+  patches.forEach(({ target, replacement, check }) => {
+    // Check if the patch (or the check string) already exists in the file
+    const validationStr = check || replacement;
+    if (content.includes(validationStr)) {
       return;
     }
 
-    if (content.includes(replacement.target)) {
-        content = content.split(replacement.target).join(replacement.replacement);
+    if (content.includes(target)) {
+      // Use global replacement if needed, though for headers we usually want the first hit
+      content = content.split(target).join(replacement);
+      appliedCount++;
     }
   });
 
   if (content !== originalContent) {
-    fs.writeFileSync(fullPath, content, 'utf8');
-    console.log(`✅ Optimized: ${filePath}`);
+    fs.writeFileSync(absolutePath, content, 'utf8');
+    console.log(`✅ Patched [${appliedCount} changes]: ${relativePath}`);
+  } else {
+    console.log(`ℹ️  Already compliant: ${relativePath}`);
   }
 }
 
-// 1. Fix Yoga.podspec - Correct Ruby comment and aggressively remove Werror
-// We use a broader match to ensure it catches variations in whitespace
-patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
+// --- 1. Patch Yoga.cpp ---
+// Targets: Missing <algorithm>/<functional> and implicit YGEdges initialization
+applySurgicalPatch('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
   {
-    target: "'-Werror',",
-    replacement: "# '-Werror',",
-    check: "# '-Werror',"
+    // Inject modern C++ template utilities
+    target: '#include "Yoga.h"',
+    replacement: '#include "Yoga.h"\n#include <algorithm>\n#include <functional>',
+    check: '#include <algorithm>'
   },
   {
-    target: "'-Wall',",
-    replacement: "# '-Wall',",
-    check: "# '-Wall',"
+    // Fix implicit structural return for YGEdges
+    // Modern Clang requires explicit typing for brace-enclosed initializer lists in this context
+    target: 'return {left, top, right, bottom};',
+    replacement: 'return YGEdges{left, top, right, bottom};'
   }
 ]);
 
-// 2. react-native-date-picker: UIKit & Enum casting
-patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
+// --- 2. Patch YGNode.cpp ---
+// Target: Missing <algorithm> for math/comparison operations
+applySurgicalPatch('node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp', [
   {
-    target: '#import "RNDatePickerManager.h"',
-    replacement: '#import <UIKit/UIKit.h>\n#import "RNDatePickerManager.h"',
-    check: '#import <UIKit/UIKit.h>'
-  },
-  {
-    target: 'UIControlEventValueChanged',
-    replacement: '(UIControlEvents)UIControlEventValueChanged'
+    target: '#include "YGNode.h"',
+    replacement: '#include "YGNode.h"\n#include <algorithm>',
+    check: '#include <algorithm>'
   }
 ]);
 
-// 3. react-native-screens: UIKit in Traits
-patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
-  {
-    target: '@implementation RNSScreenWindowTraits',
-    replacement: '#import <UIKit/UIKit.h>\n\n@implementation RNSScreenWindowTraits',
-    check: '#import <UIKit/UIKit.h>'
-  }
-]);
-
-// 4. NUCLEAR PRAGMA INJECTION: Yoga Source Files
-// We use a recursive search to find every Yoga file regardless of internal structure changes
-const yogaRoot = path.join(process.cwd(), 'node_modules/react-native/ReactCommon/yoga/yoga');
-if (fs.existsSync(yogaRoot)) {
-    const patchYogaSource = (dir) => {
-        const files = fs.readdirSync(dir);
-        files.forEach(file => {
-            const fullPath = path.join(dir, file);
-            if (fs.statSync(fullPath).isDirectory()) {
-                patchYogaSource(fullPath);
-            } else if (file.endsWith('.cpp') || file.endsWith('.h')) {
-                let content = fs.readFileSync(fullPath, 'utf8');
-                if (!content.includes('pragma clang diagnostic ignored "-Weverything"')) {
-                    // Inject at the absolute top
-                    const nuclearPragma = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n';
-                    fs.writeFileSync(fullPath, nuclearPragma + content + '\n#pragma clang diagnostic pop', 'utf8');
-                    console.log(`☢️  Nuclear Pragma applied: ${file}`);
-                }
-            }
-        });
-    };
-    patchYogaSource(yogaRoot);
-}
-
-console.log('✨ Dependency optimization complete.');
+console.log('✨ Infrastructure patching complete. Ready for high-performance compilation.');
