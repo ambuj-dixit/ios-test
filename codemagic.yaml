@@ -13,22 +13,20 @@ workflows:
     scripts:
       - name: Prep
         script: |
+          echo "Cleaning environment and installing dependencies..."
           rm -rf node_modules ios/Pods ios/build
           npm install --legacy-peer-deps
       - name: Nuclear Patch
         script: |
-          # 1. Clean build environment
-          find . -name "*.storyboard.xml" -delete || true
-          
-          # 2. Run the specialized dependency patcher
+          echo "Executing Surgical Dependency Fixes..."
           node scripts/patch-ios-dependencies.js
       - name: Pods
         script: |
-          cd ios
-          pod install --repo-update
+          echo "Installing CocoaPods..."
+          cd ios && pod install --repo-update
       - name: Build
         script: |
-          # Use xcodebuild archive with maximum warning suppression
+          echo "Starting Production Archive..."
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -43,16 +41,17 @@ workflows:
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             WARNING_CFLAGS="-w"
           
+          echo "Packaging IPA..."
           mkdir -p build/ios/ipa
-          # Find the app binary in the archive and package it
+          # Dynamically locate the app binary
           APP=$(find build/Esimcampus.xcarchive -name "*.app" | head -n 1)
           if [ -d "$APP" ]; then
             cd $(dirname "$APP")
             mkdir Payload && cp -r $(basename "$APP") Payload/
             zip -r ../../../ios/ipa/Esimcampus.ipa Payload
+            echo "✅ Build Successful."
           else
-            echo "CRITICAL FAILURE: Build archive did not contain an app binary."
-            find build/Esimcampus.xcarchive -maxdepth 4
+            echo "❌ CRITICAL FAILURE: Build archive did not contain an app binary."
             exit 1
           fi
     artifacts:
