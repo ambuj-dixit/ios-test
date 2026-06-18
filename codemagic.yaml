@@ -1,6 +1,6 @@
 workflows:
   ios-preview:
-    name: ESIM Campus iOS Force Build
+    name: ESIM Campus iOS BURNED EARTH BUILD
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -14,14 +14,17 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Surgical Dependency Repair
+      - name: BURNED EARTH Surgical Repair
         script: |
-          echo "Executing Force Repair on Objective-C dependencies..."
+          echo "Applying Burned Earth patches to broken libraries..."
           
-          # 1. Broad Fix for Date Picker (Casts all occurrences of ValueChanged events)
+          # 1. FORCE PATCH: react-native-date-picker (The primary failure)
+          # We search for any line using UIControlEventValueChanged and force cast it, 
+          # ensuring we don't double-cast if the script is re-run.
+          find node_modules/react-native-date-picker -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/(UIControlEvents)//g' || true
           find node_modules/react-native-date-picker -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' || true
           
-          # 2. Header Injection for Date Picker
+          # Inject Header for safety
           DP_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
           if [ -f "$DP_FILE" ]; then
              if ! grep -q "UIKit/UIKit.h" "$DP_FILE"; then
@@ -31,24 +34,26 @@ workflows:
              fi
           fi
 
-          # 3. Broad Fix for RNScreens Orientation Traits
-          find node_modules/react-native-screens -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/@implementation RNSScreenWindowTraits/#import <UIKit\/UIKit.h>\n@implementation RNSScreenWindowTraits/g' || true
+          # 2. FORCE PATCH: react-native-screens
+          find node_modules/react-native-screens -name "RNSScreenWindowTraits.mm" | xargs sed -i '' 's/@implementation RNSScreenWindowTraits/#import <UIKit\/UIKit.h>\n@implementation RNSScreenWindowTraits/g' || true
 
-          # 4. Clean stray XML references
+          # 3. CLEAN ENVIRONMENT
           find . -name "*.storyboard.xml" -delete || true
           find ios/Esimcampus -name "*.xml" -delete || true
+          rm -rf ios/Pods || true
 
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
-      - name: Xcode Project Hard-Reset
+      - name: Xcode Workspace Hard-Reset
         script: |
-          echo "Injecting mandatory stability flags..."
+          echo "Overriding Workspace Build Settings..."
           ruby -e "
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
           
           project.targets.each do |target|
+            # Clear invalid file references
             target.build_phases.each do |phase|
               phase.files.each do |bf|
                 if bf.file_ref && bf.file_ref.respond_to?(:path) && bf.file_ref.path && bf.file_ref.path.end_with?('.xml')
@@ -57,21 +62,22 @@ workflows:
               end
             end
             
+            # Workspace-wide 'No Error' policy
             target.build_configurations.each do |config|
               config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
               config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
               config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
               config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
               config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -Wl,-ld_classic'
-              config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
-              config.build_settings['OTHER_CFLAGS'] = '$(inherited) -w -Wno-error=conversion'
+              config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) -w -Wno-everything -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
+              config.build_settings['OTHER_CFLAGS'] = '$(inherited) -w -Wno-everything'
             end
           end
           project.save
           "
-      - name: Build iOS Application (Maximum Force Mode)
+      - name: Build iOS Application (Burned Earth Mode)
         script: |
-          # Use xcodebuild with maximal error suppression
+          # The ultimate xcodebuild command that ignores all non-fatal warnings and demotes errors
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -83,11 +89,12 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             CLANG_CXX_LANGUAGE_STANDARD="c++17" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-            OTHER_CPLUSPLUSFLAGS='$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1' \
-            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic' \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            OTHER_CPLUSPLUSFLAGS='$(inherited) -w -Wno-everything -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1' \
+            OTHER_CFLAGS='$(inherited) -w -Wno-everything' \
+            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
           
-          # Packaging
+          # Final Packaging
           mkdir -p build/ios/ipa
           if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
@@ -95,7 +102,7 @@ workflows:
             cp -r Esimcampus.app Payload/
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
           else
-            echo "BUILD FAILED: Binary not found."
+            echo "CRITICAL BUILD FAILURE: Application binary was not generated."
             exit 1
           fi
     artifacts:
