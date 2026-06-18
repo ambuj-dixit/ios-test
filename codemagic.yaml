@@ -1,6 +1,6 @@
 workflows:
   ios-release:
-    name: ESIM Campus Professional Production
+    name: ESIM Campus Absolute Final
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -10,32 +10,18 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
         XCODE_SCHEME: "Esimcampus"
-    cache:
-      cache_paths:
-        - $HOME/.npm
-        - node_modules
-        - ios/Pods
     scripts:
-      - name: System Preparation
+      - name: Prep
         script: |
-          echo "Preparing professional environment..."
           rm -rf node_modules ios/Pods ios/build
           npm install --legacy-peer-deps
-          
-      - name: Nuclear Dependency Patching
+      - name: Nuclear Patch
+        script: node scripts/patch-ios-dependencies.js
+      - name: Pods
+        script: cd ios && pod install --repo-update
+      - name: Build
         script: |
-          echo "Applying architectural optimizations..."
-          node scripts/patch-ios-dependencies.js
-
-      - name: CocoaPods Synchronization
-        script: |
-          echo "Running pod install..."
-          cd ios && pod install --repo-update
-
-      - name: Production Build & Archive
-        script: |
-          echo "Starting absolute production archive..."
-          # WARNING_CFLAGS="-w" is the ultimate flag to bypass all compiler warning errors
+          # The absolute final suppression flags
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -45,24 +31,18 @@ workflows:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
+            WARNING_CFLAGS="-w" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            WARNING_CFLAGS="-w" \
             OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
-
-          echo "IPA Generation..."
+          
           mkdir -p build/ios/ipa
-          APP_BINARY=$(find build/Esimcampus.xcarchive -name "*.app" | head -n 1)
-          if [ -d "$APP_BINARY" ]; then
-            cd $(dirname "$APP_BINARY")
-            mkdir Payload
-            cp -r $(basename "$APP_BINARY") Payload/
-            zip -r ../../../ios/ipa/Esimcampus_Production.ipa Payload
-            echo "✅ SUCCESS: IPA generated."
+          APP=$(find build/Esimcampus.xcarchive -name "*.app" | head -n 1)
+          if [ -d "$APP" ]; then
+            cd $(dirname "$APP")
+            mkdir Payload && cp -r $(basename "$APP") Payload/
+            zip -r ../../../ios/ipa/Esimcampus.ipa Payload
           else
-            echo "❌ CRITICAL: Build failed to produce binary."
             exit 1
           fi
     artifacts:
