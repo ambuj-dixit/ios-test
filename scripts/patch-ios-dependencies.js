@@ -4,21 +4,13 @@ const path = require('path');
 /**
  * patch-ios-dependencies.js
  *
- * World-Class Infrastructure Patch for React Native 0.72.x
- * Resolves C++ standards compliance issues for modern Clang (Xcode 15/16/17+).
- *
- * This script surgically updates the Yoga layout engine to handle strict C++20/C++26
- * rules regarding missing standard headers and implicit structural initializers.
+ * Senior Engineering Infrastructure Patch for React Native 0.72.x
+ * Resolves C++20/C++26 standards compliance issues for modern Clang (Xcode 15/16/17+).
  */
 
-console.log('🚀 Starting Infrastructure Patch: Yoga C++ Standards Compliance...');
+console.log('🚀 Starting Advanced Infrastructure Patch: Yoga C++ Standards Compliance...');
 
-/**
- * Surgically patches a file with a set of replacements.
- * @param {string} relativePath - Path relative to project root.
- * @param {Array<{target: string, replacement: string, check?: string}>} patches
- */
-function applySurgicalPatch(relativePath, patches) {
+function patchYogaFile(relativePath) {
   const absolutePath = path.join(process.cwd(), relativePath);
 
   if (!fs.existsSync(absolutePath)) {
@@ -28,55 +20,62 @@ function applySurgicalPatch(relativePath, patches) {
 
   let content = fs.readFileSync(absolutePath, 'utf8');
   let originalContent = content;
-  let appliedCount = 0;
+  const fileName = path.basename(absolutePath);
 
-  patches.forEach(({ target, replacement, check }) => {
-    // Check if the patch (or the check string) already exists in the file
-    const validationStr = check || replacement;
-    if (content.includes(validationStr)) {
-      return;
-    }
+  console.log(`🔍 Analyzing ${fileName}...`);
 
-    if (content.includes(target)) {
-      // Use global replacement if needed, though for headers we usually want the first hit
-      content = content.split(target).join(replacement);
-      appliedCount++;
+  // 1. Inject missing headers
+  if (fileName === 'Yoga.cpp') {
+    if (!content.includes('<algorithm>')) {
+      content = content.replace('#include "Yoga.h"', '#include "Yoga.h"\n#include <algorithm>\n#include <functional>');
+      console.log('  ✅ Injected <algorithm> and <functional>');
     }
-  });
+  } else if (fileName === 'YGNode.cpp') {
+    if (!content.includes('<algorithm>')) {
+      content = content.replace('#include "YGNode.h"', '#include "YGNode.h"\n#include <algorithm>');
+      console.log('  ✅ Injected <algorithm>');
+    }
+  }
+
+  // 2. Fix ambiguous brace-enclosed initializer list returns (C++20 strictness)
+  // This looks for 'return { ... };' patterns where there are 3 commas (4 elements),
+  // which matches the YGEdges struct initialization.
+  if (fileName === 'Yoga.cpp') {
+    const returnRegex = /return\s*\{([^}]*)\};/g;
+    let matchCount = 0;
+
+    content = content.replace(returnRegex, (match, inner) => {
+      // Skip if already patched or contains a type cast
+      if (inner.includes('YGEdges') || inner.includes('YGValue')) return match;
+
+      const commaCount = (inner.match(/,/g) || []).length;
+      if (commaCount === 3) {
+        matchCount++;
+        // Remove extra whitespace and newlines for a clean replacement
+        const sanitizedInner = inner.trim();
+        return `return YGEdges{${sanitizedInner}};`;
+      }
+      return match;
+    });
+
+    if (matchCount > 0) {
+      console.log(`  ✅ Fixed ${matchCount} ambiguous structural returns (YGEdges)`);
+    }
+  }
 
   if (content !== originalContent) {
     fs.writeFileSync(absolutePath, content, 'utf8');
-    console.log(`✅ Patched [${appliedCount} changes]: ${relativePath}`);
+    console.log(`✅ File patched successfully: ${relativePath}`);
   } else {
-    console.log(`ℹ️  Already compliant: ${relativePath}`);
+    console.log(`ℹ️  No changes needed (already compliant): ${relativePath}`);
   }
 }
 
-// --- 1. Patch Yoga.cpp ---
-// Targets: Missing <algorithm>/<functional> and implicit YGEdges initialization
-applySurgicalPatch('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
-  {
-    // Inject modern C++ template utilities
-    target: '#include "Yoga.h"',
-    replacement: '#include "Yoga.h"\n#include <algorithm>\n#include <functional>',
-    check: '#include <algorithm>'
-  },
-  {
-    // Fix implicit structural return for YGEdges
-    // Modern Clang requires explicit typing for brace-enclosed initializer lists in this context
-    target: 'return {left, top, right, bottom};',
-    replacement: 'return YGEdges{left, top, right, bottom};'
-  }
-]);
+// Target standard Yoga paths in React Native 0.72.x
+const yogaPath = 'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp';
+const ygNodePath = 'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp';
 
-// --- 2. Patch YGNode.cpp ---
-// Target: Missing <algorithm> for math/comparison operations
-applySurgicalPatch('node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp', [
-  {
-    target: '#include "YGNode.h"',
-    replacement: '#include "YGNode.h"\n#include <algorithm>',
-    check: '#include <algorithm>'
-  }
-]);
+patchYogaFile(yogaPath);
+patchYogaFile(ygNodePath);
 
-console.log('✨ Infrastructure patching complete. Ready for high-performance compilation.');
+console.log('✨ Infrastructure modernization complete.');
