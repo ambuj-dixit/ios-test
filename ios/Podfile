@@ -7,35 +7,39 @@ use_modular_headers!
 
 prepare_react_native_project!
 
-# 🚀 PROJECT-WIDE PRODUCTION CONFIGURATION
+# 🚀 ULTIMATE PRODUCTION ARCHITECTURE - REFINED
 $RNFirebaseAsStaticFramework = true
 use_frameworks! :linkage => :static
 
 global_config = use_native_modules!
 
-# Professional Build Settings Factory
+# Centralized Professional Build Settings
 def apply_professional_settings(config, is_extension = false)
   s = config.build_settings
 
+  # 1. SDK & Standards
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
   s['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
   s['CLANG_CXX_LIBRARY'] = 'libc++'
   s['DEFINES_MODULE'] = 'YES'
   s['USE_HEADERMAP'] = 'NO'
   s['CLANG_ENABLE_MODULES'] = 'YES'
+  s['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
 
-  # Modern Linker Fix (Xcode 15/16)
+  # 2. Modern Linker Fix (Xcode 15/16)
   s['OTHER_LDFLAGS'] ||= ['$(inherited)']
-  s['OTHER_LDFLAGS'] << '-Wl,-ld_classic' unless s['OTHER_LDFLAGS'].include?('-Wl,-ld_classic')
+  unless s['OTHER_LDFLAGS'].include?('-Wl,-ld_classic')
+    s['OTHER_LDFLAGS'] << '-Wl,-ld_classic'
+  end
 
-  # Warning Management - Treating everything as a warning, never an error
+  # 3. Aggressive Warning Management
   s['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
   s['RUN_CLANG_STATIC_ANALYZER'] = 'NO'
   s['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
   s['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
   s['WARNING_CFLAGS'] = '-w'
 
-  # Global Stability Flags
+  # 4. Compiler Flags
   s['OTHER_CPLUSPLUSFLAGS'] ||= ['$(inherited)']
   ['-w', '-fpermissive', '-Wno-everything', '-D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'].each do |f|
     s['OTHER_CPLUSPLUSFLAGS'] << f unless s['OTHER_CPLUSPLUSFLAGS'].include?(f)
@@ -46,13 +50,16 @@ def apply_professional_settings(config, is_extension = false)
     s['OTHER_CFLAGS'] << f unless s['OTHER_CFLAGS'].include?(f)
   end
 
-  # Macro Injection
+  # 5. Macro Injection
   s['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
   macro = 'UIControlEventValueChanged=(UIControlEvents)UIControlEventValueChanged'
-  s['GCC_PREPROCESSOR_DEFINITIONS'] << macro unless s['GCC_PREPROCESSOR_DEFINITIONS'].include?(macro)
+  unless s['GCC_PREPROCESSOR_DEFINITIONS'].include?(macro)
+    s['GCC_PREPROCESSOR_DEFINITIONS'] << macro
+  end
 
+  # 6. Compliance & Security
   s['APPLICATION_EXTENSION_API_ONLY'] = is_extension ? 'YES' : 'NO'
-  s['CODE_SIGNING_ALLOWED'] = 'NO'
+  s['ENABLE_BITCODE'] = 'NO'
 end
 
 target 'Esimcampus' do
@@ -76,60 +83,66 @@ target 'OneSignalNotificationServiceExtension' do
 end
 
 post_install do |installer|
-  # 1. CocoaPods 1.15+ Privacy Fix
+  # 1. CocoaPods Privacy Fix
   if defined?(PrivacyManifestUtils)
     PrivacyManifestUtils.singleton_class.define_method(:add_aggregated_privacy_manifest) do |_installer|
     end
   end
 
-  # 2. Standard React Native Post Install
+  # 2. React Native Standard Post Install
   react_native_post_install(
     installer,
     global_config[:reactNativePath],
     :mac_catalyst_enabled => false
   )
 
-  # 3. Surgical Target Optimization
+  # 3. Surgical Target Hardening
   installer.pods_project.targets.each do |target|
-    is_ext_pod = target.name.include?('OneSignal') || target.name.include?('NotificationService')
 
-    target.build_configurations.each do |config|
-      apply_professional_settings(config, is_ext_pod)
+    # Apply global professional settings
+    is_ext_pod = target.name.include?('OneSignal') || target.name.include?('NotificationService')
+    target.build_configurations.each { |config| apply_professional_settings(config, is_ext_pod) }
+
+    # TARGET SPECIFIC RECONSTRUCTION
+
+    # A. Resolve Yoga compilation by stripping ALL flags and forcing pure suppression
+    if target.name == 'Yoga'
+      target.build_configurations.each do |config|
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = ['$(inherited)', '-w', '-Wno-everything']
+        config.build_settings['OTHER_CFLAGS'] = ['$(inherited)', '-w', '-Wno-everything']
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+      end
     end
 
-    # RESOLVE React-Core AMBIGUITY & DUPLICATE HEADERS
+    # B. Eliminate "Duplicate Output File" for headers in React-Core
     if target.name.include?('React-Core.common-CoreModulesHeaders')
-      # This target is redundant in framework builds and causes collisions
       target.build_configurations.each do |config|
         config.build_settings['SKIP_INSTALL'] = 'YES'
-        config.build_settings['PRODUCT_NAME'] = "React_Redundant_Headers"
+        config.build_settings['PRODUCT_NAME'] = "ReactCoreRedundant"
       end
-
-      # Nuclear option: Remove all build phases from the redundant target
+      # Delete build phases to ensure no files are copied
       target.build_phases.each do |phase|
         target.build_phases.delete(phase)
       end
     end
 
-    # Fix Yoga specifically
-    if target.name == 'Yoga'
+    # C. Fix Bundle Name collisions
+    if target.name.include?('AccessibilityResources')
       target.build_configurations.each do |config|
-        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error'
+        config.build_settings['PRODUCT_NAME'] = "Res_#{target.name.gsub(/[^0-9a-z]/i, '_')}"
       end
     end
   end
 
-  # 4. Final Aggregator & Main Project Sync
+  # 4. Final Sync
   installer.aggregate_targets.each do |aggregate_target|
     aggregate_target.user_project.targets.each do |target|
       is_ext = target.name.include?('Extension')
       target.build_configurations.each do |config|
         apply_professional_settings(config, is_ext)
         if is_ext
-           # Hard strip React from Extension linker to avoid ambiguity
            ld_flags = config.build_settings['OTHER_LDFLAGS'] || []
-           config.build_settings['OTHER_LDFLAGS'] = ld_flags.reject { |flag| flag.to_s.include?('React') }
+           config.build_settings['OTHER_LDFLAGS'] = ld_flags.reject { |f| f.to_s.include?('React') }
         end
       end
     end
