@@ -17,7 +17,7 @@ import styles from './styles';
 import {backgroundImage, downloadIcon} from '../../assets/images';
 import {HeaderWithTitle} from '../../components';
 
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 // import ReactNativeBlobUtil from 'react-native-blob-util';
 
 import {hideLoader, showLoader} from '../../components/appLoader';

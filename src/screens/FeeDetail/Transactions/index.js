@@ -8,7 +8,7 @@ import {
   showErrorMessage,
   showSuccessMessage,
 } from '../../../utils/commonFunctions';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 import {Alert, Platform} from 'react-native';
 
 function FeeDetailContainer(props) {

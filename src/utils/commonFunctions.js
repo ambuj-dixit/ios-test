@@ -1,6 +1,6 @@
 import Toast from 'react-native-root-toast';
 import {colors} from '../styles';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 import {Platform} from 'react-native';
 
 /**

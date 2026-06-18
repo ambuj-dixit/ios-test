@@ -1,11 +1,11 @@
 workflows:
   ios-preview:
-    name: ESIM Campus iOS Production Build
+    name: ESIM Campus iOS Ultimate Fix Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 18
-      xcode: 26.4
+      xcode: latest
       cocoapods: default
       vars:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
@@ -13,15 +13,29 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          npm ci --legacy-peer-deps
-      - name: Install CocoaPods
+          npm install --legacy-peer-deps
+      - name: Xcode Project Cleanup
         script: |
-          cd ios && pod install --repo-update
-      - name: Prepare Xcode project
-        script: |
+          echo "Cleaning Xcode project of stray files..."
+          # Delete actual stray files on disk that cause 'No rule to process'
+          find . -name "*.storyboard.xml" -delete || true
+          find ios/Esimcampus -name "*.xml" -delete || true
+          
+          # Remove broken .xml references from the .xcodeproj file
           ruby -e "
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
+          
+          project.targets.each do |target|
+            target.build_phases.each do |phase|
+              phase.files.each do |bf|
+                if bf.file_ref && bf.file_ref.respond_to?(:path) && bf.file_ref.path && bf.file_ref.path.end_with?('.xml')
+                   puts \"Removing #{bf.file_ref.path} from target #{target.name}\"
+                   phase.remove_build_file(bf)
+                end
+              end
+            end
+          end
 
           project.targets.each do |target|
             target.build_configurations.each do |config|
@@ -34,8 +48,12 @@ workflows:
           end
           project.save
           "
+      - name: Install CocoaPods
+        script: |
+          cd ios && pod install --repo-update
       - name: Build iOS Application (Ultimate Mode)
         script: |
+          # Use standard quoting and suppress all warnings to speed up build
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -45,7 +63,6 @@ workflows:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            RCT_NO_LAUNCH_PACKAGER=1 \
             CLANG_CXX_LANGUAGE_STANDARD="c++17" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             OTHER_CPLUSPLUSFLAGS='$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1' \
@@ -55,7 +72,7 @@ workflows:
           mkdir -p build/ios/ipa
           if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
-            mkdir -p Payload
+            mkdir Payload
             cp -r Esimcampus.app Payload/
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
           else

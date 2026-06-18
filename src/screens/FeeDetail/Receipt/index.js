@@ -8,7 +8,7 @@ import {
   showErrorMessage,
   showSuccessMessage,
 } from '../../../utils/commonFunctions';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 import {Platform} from 'react-native';
 import {hideLoader, showLoader} from '../../../components/appLoader';
 import commonFunctions from '../../../utils';

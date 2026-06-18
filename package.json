@@ -37,6 +37,7 @@
     "qs": "^6.14.0",
     "react": "18.2.0",
     "react-native": "^0.72.17",
+    "react-native-blob-util": "^0.19.9",
     "react-native-bootsplash": "^5.0.3",
     "react-native-calendars": "^1.1302.0",
     "react-native-cashfree-pg-sdk": "^2.1.18",
@@ -76,7 +77,6 @@
     "redux-persist": "^6.0.0",
     "redux-thunk": "^2.4.2",
     "remote-redux-devtools": "^0.5.14",
-    "rn-fetch-blob": "^0.12.0",
     "sp-react-native-in-app-updates": "^1.0.0",
     "uuid": "^3.2.1",
     "yarn": "^1.22.22"

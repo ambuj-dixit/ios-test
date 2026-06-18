@@ -9,7 +9,7 @@ import {View, Text} from 'react-native';
 import styles from './styles';
 import {globalConstants} from '../../constants';
 import RazorpayCheckout from 'react-native-razorpay';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 import axios from 'axios';
 import {printDataForBase64} from '../../utils/commonFunctions';
 

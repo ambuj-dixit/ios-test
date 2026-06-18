@@ -3,7 +3,7 @@ import {connect, useDispatch} from 'react-redux';
 import {marksheetOperations} from '../../reduxOperations/marksheet';
 
 import Marksheetview from './Marksheetview';
-import RNFetchBlob from 'rn-fetch-blob';
+import RNFetchBlob from 'react-native-blob-util';
 import {showErrorMessage} from '../../utils/commonFunctions';
 import {Alert, Platform} from 'react-native';
 import {globalConstants} from '../../constants';
