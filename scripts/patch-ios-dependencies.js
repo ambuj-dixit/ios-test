@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Executing Safe & Professional iOS Dependency Optimization...');
+console.log('🚀 Executing Surgical iOS Dependency Optimization (v5)...');
 
 /**
  * Surgically patches a file with provided replacements.
@@ -21,7 +21,6 @@ function patchFile(filePath, replacements) {
       return;
     }
 
-    // Using string replacement instead of regex to avoid parsing issues
     if (content.includes(replacement.target)) {
         content = content.split(replacement.target).join(replacement.replacement);
     }
@@ -33,7 +32,16 @@ function patchFile(filePath, replacements) {
   }
 }
 
-// 1. Fix react-native-date-picker: Missing UIKit and proper Enum casting
+// 1. Fix Yoga.podspec - Correct Ruby comment and aggressively remove Werror
+patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
+  {
+    target: "'-Werror',",
+    replacement: "# '-Werror',",
+    check: "# '-Werror',"
+  }
+]);
+
+// 2. react-native-date-picker: UIKit & Enum casting
 patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   {
     target: '#import "RNDatePickerManager.h"',
@@ -46,7 +54,7 @@ patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   }
 ]);
 
-// 2. Fix react-native-screens: Missing UIKit in Traits
+// 3. react-native-screens: UIKit in Traits
 patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   {
     target: '@implementation RNSScreenWindowTraits',
@@ -55,15 +63,18 @@ patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   }
 ]);
 
-// 3. NUCLEAR PRAGMA INJECTION: Yoga Source Files
-// We inject pragmas directly into source files to kill warnings at the compiler entry point.
+// 4. NUCLEAR PRAGMA INJECTION: Yoga Source Files
+// Injects pragmas directly into source files to kill all warnings and modular header issues.
 const yogaFiles = [
   'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGStyle.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGEnums.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGConfig.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/Utils.cpp'
+  'node_modules/react-native/ReactCommon/yoga/yoga/Utils.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGValue.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGNodePrint.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGLayout.cpp'
 ];
 
 yogaFiles.forEach(file => {
@@ -71,6 +82,7 @@ yogaFiles.forEach(file => {
   if (fs.existsSync(fullPath)) {
     let content = fs.readFileSync(fullPath, 'utf8');
     if (!content.includes('pragma clang diagnostic ignored "-Weverything"')) {
+      // Add the pragma at the very top, before any includes
       content = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n' + content + '\n#pragma clang diagnostic pop';
       fs.writeFileSync(fullPath, content, 'utf8');
       console.log(`☢️  Nuclear Pragma applied to source: ${file}`);
@@ -78,4 +90,4 @@ yogaFiles.forEach(file => {
   }
 });
 
-console.log('✨ Safe dependency optimization complete.');
+console.log('✨ Dependency optimization complete.');
