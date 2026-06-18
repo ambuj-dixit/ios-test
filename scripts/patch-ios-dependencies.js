@@ -91,8 +91,17 @@ patchFile('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
 patchFile('node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp', [
   {
     description: 'Inject missing header (<algorithm>)',
-    target: '#include "YGNode.h"',
-    replacement: '#include "YGNode.h"\n#include <algorithm>'
+    target: '#include <yoga/Yoga.h>',
+    replacement: '#include <yoga/Yoga.h>\n#include <algorithm>'
+  }
+]);
+
+// 2b. Patch YGNodeStyle.cpp
+patchFile('node_modules/react-native/ReactCommon/yoga/yoga/YGNodeStyle.cpp', [
+  {
+    description: 'Inject missing header (<algorithm>)',
+    target: '#include <yoga/Yoga.h>',
+    replacement: '#include <yoga/Yoga.h>\n#include <algorithm>'
   }
 ]);
 
