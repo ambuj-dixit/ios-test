@@ -1,6 +1,6 @@
 workflows:
   ios-preview:
-    name: ESIM Campus iOS Ultimate Build
+    name: ESIM Campus iOS Force Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -14,24 +14,40 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-      - name: Clean Environment
+      - name: Surgical Dependency Repair
         script: |
-          echo "Removing stray files and cleaning project..."
+          echo "Executing Force Repair on Objective-C dependencies..."
+          
+          # 1. Broad Fix for Date Picker (Casts all occurrences of ValueChanged events)
+          find node_modules/react-native-date-picker -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' || true
+          
+          # 2. Header Injection for Date Picker
+          DP_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
+          if [ -f "$DP_FILE" ]; then
+             if ! grep -q "UIKit/UIKit.h" "$DP_FILE"; then
+                echo '#import <UIKit/UIKit.h>' > "$DP_FILE.tmp"
+                cat "$DP_FILE" >> "$DP_FILE.tmp"
+                mv "$DP_FILE.tmp" "$DP_FILE"
+             fi
+          fi
+
+          # 3. Broad Fix for RNScreens Orientation Traits
+          find node_modules/react-native-screens -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/@implementation RNSScreenWindowTraits/#import <UIKit\/UIKit.h>\n@implementation RNSScreenWindowTraits/g' || true
+
+          # 4. Clean stray XML references
           find . -name "*.storyboard.xml" -delete || true
           find ios/Esimcampus -name "*.xml" -delete || true
-          rm -rf ios/Pods || true
-          rm -rf ios/build || true
+
       - name: Install CocoaPods
         script: |
           cd ios && pod install --repo-update
-      - name: Final Build Optimization
+      - name: Xcode Project Hard-Reset
         script: |
-          echo "Injecting final build settings into the workspace..."
+          echo "Injecting mandatory stability flags..."
           ruby -e "
           require 'xcodeproj'
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
           
-          # Remove broken XML references from build phases
           project.targets.each do |target|
             target.build_phases.each do |phase|
               phase.files.each do |bf|
@@ -41,7 +57,6 @@ workflows:
               end
             end
             
-            # Project level stability
             target.build_configurations.each do |config|
               config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
               config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
@@ -49,13 +64,14 @@ workflows:
               config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
               config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -Wl,-ld_classic'
               config.build_settings['OTHER_CPLUSPLUSFLAGS'] = '$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
+              config.build_settings['OTHER_CFLAGS'] = '$(inherited) -w -Wno-error=conversion'
             end
           end
           project.save
           "
-      - name: Build iOS Application (Production Ready)
+      - name: Build iOS Application (Maximum Force Mode)
         script: |
-          # Use xcodebuild with forced parameters for the workspace
+          # Use xcodebuild with maximal error suppression
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -68,7 +84,8 @@ workflows:
             CLANG_CXX_LANGUAGE_STANDARD="c++17" \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             OTHER_CPLUSPLUSFLAGS='$(inherited) -w -D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1' \
-            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
+            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic' \
+            COMPILER_INDEX_STORE_ENABLE=NO
           
           # Packaging
           mkdir -p build/ios/ipa
