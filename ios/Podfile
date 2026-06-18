@@ -19,7 +19,7 @@ def apply_professional_settings(config, is_extension = false)
 
   # 1. SDK & Toolchain
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-  s['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+  s['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
   s['CLANG_CXX_LIBRARY'] = 'libc++'
   s['DEFINES_MODULE'] = 'YES'
   s['USE_HEADERMAP'] = 'NO'

@@ -64,6 +64,26 @@ patchFile('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
         if (inner.includes('YGEdges')) return match;
         return `return YGEdges{${inner.trim()}};`;
     }
+  },
+  {
+    description: 'Fix void return paths (setContext)',
+    target: 'return node->setContext(context);',
+    replacement: 'node->setContext(context);'
+  },
+  {
+    description: 'Fix void return paths (setNodeType)',
+    target: 'return node->setNodeType(nodeType);',
+    replacement: 'node->setNodeType(nodeType);'
+  },
+  {
+    description: 'Fix void return paths (markDirtyAndPropogateDownwards)',
+    target: 'return node->markDirtyAndPropogateDownwards();',
+    replacement: 'node->markDirtyAndPropogateDownwards();'
+  },
+  {
+    description: 'Fix detail namespace ambiguity',
+    target: 'using detail::Log;',
+    replacement: 'using facebook::yoga::detail::Log;'
   }
 ]);
 
