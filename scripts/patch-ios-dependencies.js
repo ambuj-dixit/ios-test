@@ -71,7 +71,7 @@ function patchYogaFile(relativePath) {
   }
 }
 
-// Target standard Yoga paths in React Native 0.72.x
+
 const yogaPath = 'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp';
 const ygNodePath = 'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp';
 
