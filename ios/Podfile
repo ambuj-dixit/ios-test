@@ -2,16 +2,6 @@ require Pod::Executable.execute_command('node', ['-p',
   'require.resolve("react-native/scripts/react_native_pods.rb", {paths: [process.argv[1]]})',
   __dir__]).strip
 
-# World-Class Fix for React Native 0.72 stability
-buggy_utils_path = File.expand_path('../node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', __dir__)
-require buggy_utils_path if File.exist?(buggy_utils_path)
-
-module PrivacyManifestUtils
-  def self.add_aggregated_privacy_manifest(installer)
-    Pod::UI.puts "[ESIM Fix] Bypassed buggy PrivacyManifestUtils".yellow
-  end
-end
-
 platform :ios, '15.0'
 use_modular_headers!
 
@@ -40,6 +30,12 @@ target 'OneSignalNotificationServiceExtension' do
 end
 
 post_install do |installer|
+  if defined?(PrivacyManifestUtils)
+    PrivacyManifestUtils.singleton_class.define_method(:add_aggregated_privacy_manifest) do |_installer|
+      Pod::UI.puts "[ESIM Fix] Skipping React Native 0.72 privacy manifest aggregation for Xcodeproj compatibility.".yellow
+    end
+  end
+
   react_native_post_install(
     installer,
     global_config[:reactNativePath],
