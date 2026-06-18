@@ -1,6 +1,6 @@
 workflows:
   ios-preview:
-    name: ESIM Campus iOS BURNED EARTH BUILD
+    name: ESIM Campus iOS BRUTAL FORCE BUILD
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -11,36 +11,41 @@ workflows:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
         XCODE_SCHEME: "Esimcampus"
     scripts:
-      - name: Install dependencies
+      - name: Clean Environment & Install
         script: |
+          rm -rf node_modules ios/Pods ios/build
           npm install --legacy-peer-deps
-      - name: BURNED EARTH Surgical Repair
+      - name: BRUTAL Surgical Patching
         script: |
-          echo "Applying Burned Earth patches to broken libraries..."
+          echo "Executing Nuclear Patch on broken libraries..."
           
-          # 1. FORCE PATCH: react-native-date-picker (The primary failure)
-          # We search for any line using UIControlEventValueChanged and force cast it, 
-          # ensuring we don't double-cast if the script is re-run.
-          find node_modules/react-native-date-picker -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/(UIControlEvents)//g' || true
-          find node_modules/react-native-date-picker -name "*.mm" -o -name "*.m" | xargs sed -i '' 's/UIControlEventValueChanged/(UIControlEvents)UIControlEventValueChanged/g' || true
-          
-          # Inject Header for safety
-          DP_FILE="node_modules/react-native-date-picker/ios/RNDatePickerManager.mm"
-          if [ -f "$DP_FILE" ]; then
-             if ! grep -q "UIKit/UIKit.h" "$DP_FILE"; then
-                echo '#import <UIKit/UIKit.h>' > "$DP_FILE.tmp"
-                cat "$DP_FILE" >> "$DP_FILE.tmp"
-                mv "$DP_FILE.tmp" "$DP_FILE"
-             fi
-          fi
+          # 1. Use Ruby to surgically fix react-native-date-picker
+          ruby -e "
+          file_path = 'node_modules/react-native-date-picker/ios/RNDatePickerManager.mm'
+          if File.exist?(file_path)
+            content = File.read(file_path)
+            content = '#import <UIKit/UIKit.h>\n' + content unless content.include?('UIKit/UIKit.h')
+            content.gsub!('UIControlEventValueChanged', '(UIControlEvents)UIControlEventValueChanged')
+            content.gsub!('(UIControlEvents)(UIControlEvents)', '(UIControlEvents)')
+            File.write(file_path, content)
+            puts '✅ react-native-date-picker patched successfully'
+          end
+          "
 
-          # 2. FORCE PATCH: react-native-screens
-          find node_modules/react-native-screens -name "RNSScreenWindowTraits.mm" | xargs sed -i '' 's/@implementation RNSScreenWindowTraits/#import <UIKit\/UIKit.h>\n@implementation RNSScreenWindowTraits/g' || true
+          # 2. Use Ruby to fix react-native-screens
+          ruby -e "
+          file_path = 'node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm'
+          if File.exist?(file_path)
+            content = File.read(file_path)
+            content = '#import <UIKit/UIKit.h>\n' + content unless content.include?('UIKit/UIKit.h')
+            File.write(file_path, content)
+            puts '✅ react-native-screens patched successfully'
+          end
+          "
 
-          # 3. CLEAN ENVIRONMENT
+          # 3. Clean environment
           find . -name "*.storyboard.xml" -delete || true
           find ios/Esimcampus -name "*.xml" -delete || true
-          rm -rf ios/Pods || true
 
       - name: Install CocoaPods
         script: |
@@ -53,7 +58,6 @@ workflows:
           project = Xcodeproj::Project.open('ios/Esimcampus.xcodeproj')
           
           project.targets.each do |target|
-            # Clear invalid file references
             target.build_phases.each do |phase|
               phase.files.each do |bf|
                 if bf.file_ref && bf.file_ref.respond_to?(:path) && bf.file_ref.path && bf.file_ref.path.end_with?('.xml')
@@ -62,7 +66,6 @@ workflows:
               end
             end
             
-            # Workspace-wide 'No Error' policy
             target.build_configurations.each do |config|
               config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
               config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
@@ -75,9 +78,8 @@ workflows:
           end
           project.save
           "
-      - name: Build iOS Application (Burned Earth Mode)
+      - name: Build iOS Application (BRUTAL MODE)
         script: |
-          # The ultimate xcodebuild command that ignores all non-fatal warnings and demotes errors
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -94,7 +96,6 @@ workflows:
             OTHER_CFLAGS='$(inherited) -w -Wno-everything' \
             OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
           
-          # Final Packaging
           mkdir -p build/ios/ipa
           if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
