@@ -1,36 +1,36 @@
 workflows:
   ios-preview:
-    name: ESIM Campus World-Class iOS Build
+    name: ESIM Campus Professional iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 18
-      xcode: latest # Ensures we use the latest stable Xcode
+      xcode: latest
       cocoapods: default
       vars:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
         XCODE_SCHEME: "Esimcampus"
     scripts:
-      - name: Environment Setup
+      - name: Environment Cleanup & Install
         script: |
-          echo "Setting up Node.js and dependencies..."
+          echo "Cleaning environment..."
           rm -rf node_modules ios/Pods ios/build
           npm install --legacy-peer-deps
           
-      - name: Run Dependency Patches
+      - name: Professional Patching
         script: |
-          echo "Applying surgical patches to node_modules..."
+          echo "Applying surgical patches..."
           node scripts/patch-ios-dependencies.js
 
-      - name: Install CocoaPods
+      - name: CocoaPods Installation
         script: |
           echo "Installing CocoaPods..."
           cd ios && pod install --repo-update
 
-      - name: Build iOS Application (Optimized)
+      - name: Build & Archive iOS
         script: |
-          echo "Starting xcodebuild archive..."
-          # We rely on Podfile for build settings to ensure consistency across all targets
+          echo "Building application..."
+          # The Podfile now handles all complex build settings automatically
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -42,18 +42,16 @@ workflows:
             CODE_SIGNING_REQUIRED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO
 
-          echo "Packaging IPA for Preview..."
+          echo "Packaging IPA..."
           mkdir -p build/ios/ipa
           if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
             cd build/Esimcampus.xcarchive/Products/Applications
             mkdir Payload
             cp -r Esimcampus.app Payload/
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
-            echo "✅ IPA generated successfully."
+            echo "✅ Build Successful."
           else
-            echo "❌ CRITICAL BUILD FAILURE: Application binary was not generated."
-            # List archive contents to help debug
-            ls -R build/Esimcampus.xcarchive
+            echo "❌ Build Failed: App binary not found."
             exit 1
           fi
     artifacts:
