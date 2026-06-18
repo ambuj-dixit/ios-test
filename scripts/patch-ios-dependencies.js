@@ -1,12 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Running Professional iOS Dependency Patches...');
+console.log('🚀 Executing Surgical iOS Dependency Optimization...');
 
 function patchFile(filePath, replacements) {
   const fullPath = path.join(process.cwd(), filePath);
   if (!fs.existsSync(fullPath)) {
-    console.log(`⚠️  File not found: ${filePath}`);
+    console.log(`⚠️  File not found (Skipping): ${filePath}`);
     return;
   }
 
@@ -17,34 +17,45 @@ function patchFile(filePath, replacements) {
     if (replacement.check && content.includes(replacement.check)) {
       return;
     }
-    const targetRegex = new RegExp(replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    content = content.replace(targetRegex, replacement.replacement);
+
+    if (replacement.target instanceof RegExp) {
+      content = content.replace(replacement.target, replacement.replacement);
+    } else {
+      const escapedTarget = replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const targetRegex = new RegExp(escapedTarget, 'g');
+      content = content.replace(targetRegex, replacement.replacement);
+    }
   });
 
   if (content !== originalContent) {
     fs.writeFileSync(fullPath, content, 'utf8');
-    console.log(`✅ Patched: ${filePath}`);
+    console.log(`✅ Optimized: ${filePath}`);
   }
 }
 
-// 1. Fix Yoga.podspec (Remove -Werror)
+// 1. Fix Yoga.podspec - Use Ruby comment # instead of //
 patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
   {
     target: "'-Werror',",
-    replacement: "// '-Werror',"
+    replacement: "# '-Werror',",
+    check: "# '-Werror',"
   }
 ]);
 
-// 2. Fix react-native-date-picker
+// 2. react-native-date-picker: UIKit & Enum casting
 patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   {
     target: '#import "RNDatePickerManager.h"',
     replacement: '#import <UIKit/UIKit.h>\n#import "RNDatePickerManager.h"',
     check: '#import <UIKit/UIKit.h>'
+  },
+  {
+    target: 'UIControlEventValueChanged',
+    replacement: '(UIControlEvents)UIControlEventValueChanged'
   }
 ]);
 
-// 3. Fix react-native-screens
+// 3. react-native-screens: UIKit in Traits
 patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   {
     target: '@implementation RNSScreenWindowTraits',
@@ -53,8 +64,8 @@ patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   }
 ]);
 
-// 4. Nuclear Pragma for Yoga Source (Double protection)
-const yogaSourceFiles = [
+// 4. Source-level Warning Suppression for Yoga (Absolute safety)
+const yogaFiles = [
   'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp',
   'node_modules/react-native/ReactCommon/yoga/yoga/YGStyle.cpp',
@@ -63,7 +74,7 @@ const yogaSourceFiles = [
   'node_modules/react-native/ReactCommon/yoga/yoga/Utils.cpp'
 ];
 
-yogaSourceFiles.forEach(file => {
+yogaFiles.forEach(file => {
   const fullPath = path.join(process.cwd(), file);
   if (fs.existsSync(fullPath)) {
     let content = fs.readFileSync(fullPath, 'utf8');
@@ -75,4 +86,4 @@ yogaSourceFiles.forEach(file => {
   }
 });
 
-console.log('✨ Dependency patches finalized.');
+console.log('✨ Dependency optimization complete.');

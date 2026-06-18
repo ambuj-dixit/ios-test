@@ -3,57 +3,60 @@ require Pod::Executable.execute_command('node', ['-p',
   __dir__]).strip
 
 platform :ios, '15.0'
+use_modular_headers!
+
 prepare_react_native_project!
 
-# 🚀 PROFESSIONAL GRADE CONFIGURATION
+# 🚀 PROJECT-WIDE PRODUCTION CONFIGURATION
 $RNFirebaseAsStaticFramework = true
 use_frameworks! :linkage => :static
 
 global_config = use_native_modules!
 
+# Centralized Professional Build Settings
 def apply_professional_settings(config, is_extension = false)
-  # Ensure we are working with the actual settings hash
-  settings = config.build_settings
+  s = config.build_settings
 
-  settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-  settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
-  settings['DEFINES_MODULE'] = 'YES'
-  settings['USE_HEADERMAP'] = 'NO'
-  settings['CLANG_ENABLE_MODULES'] = 'YES'
+  # 1. Platform & Toolchain
+  s['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+  s['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+  s['CLANG_CXX_LIBRARY'] = 'libc++'
+  s['DEFINES_MODULE'] = 'YES'
+  s['USE_HEADERMAP'] = 'NO'
+  s['CLANG_ENABLE_MODULES'] = 'YES'
 
-  # Linker Fix (Xcode 15+)
-  ld_flags = settings['OTHER_LDFLAGS'] || ['$(inherited)']
-  ld_flags << '-Wl,-ld_classic' unless ld_flags.include?('-Wl,-ld_classic')
-  settings['OTHER_LDFLAGS'] = ld_flags
+  # 2. Modern Linker Fix (Xcode 15/16 compatibility)
+  s['OTHER_LDFLAGS'] ||= ['$(inherited)']
+  s['OTHER_LDFLAGS'] << '-Wl,-ld_classic' unless s['OTHER_LDFLAGS'].include?('-Wl,-ld_classic')
 
-  # Warning Management
-  settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-  settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-  settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-  settings['RUN_CLANG_STATIC_ANALYZER'] = 'NO'
+  # 3. Aggressive Suppression of Warning-Errors
+  s['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+  s['RUN_CLANG_STATIC_ANALYZER'] = 'NO'
+  s['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+  s['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+  s['WARNING_CFLAGS'] = '-w'
 
-  # C++ Flags
-  cpp_flags = settings['OTHER_CPLUSPLUSFLAGS'] || ['$(inherited)']
+  # 4. Global Stability Flags
+  s['OTHER_CPLUSPLUSFLAGS'] ||= ['$(inherited)']
   ['-w', '-fpermissive', '-Wno-everything', '-D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'].each do |f|
-    cpp_flags << f unless cpp_flags.include?(f)
+    s['OTHER_CPLUSPLUSFLAGS'] << f unless s['OTHER_CPLUSPLUSFLAGS'].include?(f)
   end
-  settings['OTHER_CPLUSPLUSFLAGS'] = cpp_flags
 
-  # C Flags
-  c_flags = settings['OTHER_CFLAGS'] || ['$(inherited)']
+  s['OTHER_CFLAGS'] ||= ['$(inherited)']
   ['-w', '-fpermissive', '-Wno-everything'].each do |f|
-    c_flags << f unless c_flags.include?(f)
+    s['OTHER_CFLAGS'] << f unless s['OTHER_CFLAGS'].include?(f)
   end
-  settings['OTHER_CFLAGS'] = c_flags
 
-  # Preprocessor
-  defs = settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+  # 5. Core Preprocessor Macros
+  s['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
   macro = 'UIControlEventValueChanged=(UIControlEvents)UIControlEventValueChanged'
-  defs << macro unless defs.include?(macro)
-  settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+  s['GCC_PREPROCESSOR_DEFINITIONS'] << macro unless s['GCC_PREPROCESSOR_DEFINITIONS'].include?(macro)
 
-  settings['APPLICATION_EXTENSION_API_ONLY'] = is_extension ? 'YES' : 'NO'
-  settings['CODE_SIGNING_ALLOWED'] = 'NO'
+  # 6. Extension API Compliance
+  s['APPLICATION_EXTENSION_API_ONLY'] = is_extension ? 'YES' : 'NO'
+
+  # 7. Code Signing Bypass (for Pods)
+  s['CODE_SIGNING_ALLOWED'] = 'NO'
 end
 
 target 'Esimcampus' do
@@ -72,6 +75,7 @@ target 'Esimcampus' do
 end
 
 target 'OneSignalNotificationServiceExtension' do
+  # Linker: Static frameworks for extensions
   use_frameworks! :linkage => :static
   pod 'OneSignalXCFramework', '3.12.10'
 end
@@ -83,7 +87,7 @@ post_install do |installer|
     end
   end
 
-  # 2. Standard React Native Post Install
+  # 2. React Native Standard Post Install
   react_native_post_install(
     installer,
     global_config[:reactNativePath],
@@ -92,21 +96,39 @@ post_install do |installer|
 
   # 3. Surgical Target Optimization
   installer.pods_project.targets.each do |target|
+
+    # Identify pods used by Extension
     is_ext_pod = target.name.include?('OneSignal') || target.name.include?('NotificationService')
 
     target.build_configurations.each do |config|
       apply_professional_settings(config, is_ext_pod)
     end
 
-    # Fix for React-Core Collision (The duplicate output file error)
-    if target.name.include?('React-Core.common-CoreModulesHeaders')
+    # TARGET SPECIFIC RESOLUTIONS
+
+    # Yoga: Remove -Werror if it persists
+    if target.name == 'Yoga'
       target.build_configurations.each do |config|
-        config.build_settings['PRODUCT_NAME'] = "ReactCoreHeaders"
-        config.build_settings['MODULE_NAME'] = "ReactCoreHeaders"
-        config.build_settings['SKIP_INSTALL'] = 'YES'
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-Wno-error'
+        config.build_settings['OTHER_CFLAGS'] << '-Wno-error'
       end
     end
 
+    # React-Core: Stop the "Duplicate Header" collision during archive
+    if target.name.include?('React-Core.common-CoreModulesHeaders')
+      target.build_configurations.each do |config|
+        config.build_settings['PRODUCT_NAME'] = "ReactCoreHeaders"
+        config.build_settings['SKIP_INSTALL'] = 'YES'
+      end
+      # Clear the headers phase to prevent collision
+      target.build_phases.each do |phase|
+        if phase.is_a?(Xcodeproj::Project::Object::PBXHeadersBuildPhase)
+          phase.files.each { |f| phase.remove_build_file(f) }
+        end
+      end
+    end
+
+    # AccessibilityResources: Fix duplicate bundle names
     if target.name.include?('AccessibilityResources')
       target.build_configurations.each do |config|
         config.build_settings['PRODUCT_NAME'] = "Res_#{target.name.gsub(/[^0-9a-z]/i, '_')}"
@@ -114,14 +136,15 @@ post_install do |installer|
     end
   end
 
-  # 4. Final Aggregator Sync
+  # 4. Final Aggregator & Project Sync
   installer.aggregate_targets.each do |aggregate_target|
     aggregate_target.user_project.targets.each do |target|
       is_ext = target.name.include?('Extension')
       target.build_configurations.each do |config|
         apply_professional_settings(config, is_ext)
+
+        # Purge React from Extensions to satisfy Apple's strictness
         if is_ext
-           # Aggressive removal of React from Extension Linker to satisfy APPLICATION_EXTENSION_API_ONLY
            ld_flags = config.build_settings['OTHER_LDFLAGS'] || []
            config.build_settings['OTHER_LDFLAGS'] = ld_flags.reject { |flag| flag.to_s.include?('React') }
         end
