@@ -6,12 +6,16 @@ const path = require('path');
  *
  * Senior Engineering Infrastructure Patch for React Native 0.72.x
  * Resolves C++20/C++26 standards compliance issues for modern Clang (Xcode 15/16/17+).
+ * This "New Approach" covers headers, ambiguous returns, and structural initializers
+ * across Yoga.cpp, YGNode.cpp, YGValue.h, and CompactValue.h.
  */
 
 console.log('🚀 Starting Advanced Infrastructure Patch: Yoga C++ Standards Compliance...');
 
-function patchYogaFile(relativePath) {
-  const absolutePath = path.join(process.cwd(), relativePath);
+const rootDir = process.cwd();
+
+function patchFile(relativePath, patches) {
+  const absolutePath = path.join(rootDir, relativePath);
 
   if (!fs.existsSync(absolutePath)) {
     console.log(`⚠️  File not found (skipping): ${relativePath}`);
@@ -24,44 +28,19 @@ function patchYogaFile(relativePath) {
 
   console.log(`🔍 Analyzing ${fileName}...`);
 
-  // 1. Inject missing headers
-  if (fileName === 'Yoga.cpp') {
-    if (!content.includes('<algorithm>')) {
-      content = content.replace('#include "Yoga.h"', '#include "Yoga.h"\n#include <algorithm>\n#include <functional>');
-      console.log('  ✅ Injected <algorithm> and <functional>');
+  patches.forEach(p => {
+    if (typeof p.target === 'string') {
+        if (content.includes(p.target)) {
+            content = content.split(p.target).join(p.replacement);
+            console.log(`  ✅ Applied: ${p.description}`);
+        }
+    } else if (p.target instanceof RegExp) {
+        if (p.target.test(content)) {
+            content = content.replace(p.target, p.replacement);
+            console.log(`  ✅ Applied: ${p.description}`);
+        }
     }
-  } else if (fileName === 'YGNode.cpp') {
-    if (!content.includes('<algorithm>')) {
-      content = content.replace('#include "YGNode.h"', '#include "YGNode.h"\n#include <algorithm>');
-      console.log('  ✅ Injected <algorithm>');
-    }
-  }
-
-  // 2. Fix ambiguous brace-enclosed initializer list returns (C++20 strictness)
-  // This looks for 'return { ... };' patterns where there are 3 commas (4 elements),
-  // which matches the YGEdges struct initialization.
-  if (fileName === 'Yoga.cpp') {
-    const returnRegex = /return\s*\{([^}]*)\};/g;
-    let matchCount = 0;
-
-    content = content.replace(returnRegex, (match, inner) => {
-      // Skip if already patched or contains a type cast
-      if (inner.includes('YGEdges') || inner.includes('YGValue')) return match;
-
-      const commaCount = (inner.match(/,/g) || []).length;
-      if (commaCount === 3) {
-        matchCount++;
-        // Remove extra whitespace and newlines for a clean replacement
-        const sanitizedInner = inner.trim();
-        return `return YGEdges{${sanitizedInner}};`;
-      }
-      return match;
-    });
-
-    if (matchCount > 0) {
-      console.log(`  ✅ Fixed ${matchCount} ambiguous structural returns (YGEdges)`);
-    }
-  }
+  });
 
   if (content !== originalContent) {
     fs.writeFileSync(absolutePath, content, 'utf8');
@@ -71,11 +50,53 @@ function patchYogaFile(relativePath) {
   }
 }
 
+// 1. Patch Yoga.cpp
+patchFile('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
+  {
+    description: 'Inject missing headers (<algorithm>, <functional>, <stdexcept>)',
+    target: '#include "Yoga.h"',
+    replacement: '#include "Yoga.h"\n#include <algorithm>\n#include <functional>\n#include <stdexcept>'
+  },
+  {
+    description: 'Fix ambiguous structural returns (YGEdges)',
+    target: /return\s*\{([^}]*,[^}]*,[^}]*,[^}]*)\};/g,
+    replacement: (match, inner) => {
+        if (inner.includes('YGEdges')) return match;
+        return `return YGEdges{${inner.trim()}};`;
+    }
+  }
+]);
 
-const yogaPath = 'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp';
-const ygNodePath = 'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp';
+// 2. Patch YGNode.cpp
+patchFile('node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp', [
+  {
+    description: 'Inject missing header (<algorithm>)',
+    target: '#include "YGNode.h"',
+    replacement: '#include "YGNode.h"\n#include <algorithm>'
+  }
+]);
 
-patchYogaFile(yogaPath);
-patchYogaFile(ygNodePath);
+// 3. Patch YGValue.h
+patchFile('node_modules/react-native/ReactCommon/yoga/yoga/YGValue.h', [
+  {
+    description: 'Fix operator- return ambiguity',
+    target: 'return {-value.value, value.unit};',
+    replacement: 'return YGValue{-value.value, value.unit};'
+  }
+]);
+
+// 4. Patch CompactValue.h
+patchFile('node_modules/react-native/ReactCommon/yoga/yoga/CompactValue.h', [
+  {
+    description: 'Fix brace-enclosed initializer ambiguity (zero)',
+    target: 'return {zero};',
+    replacement: 'return CompactValue{zero};'
+  },
+  {
+    description: 'Fix brace-enclosed initializer ambiguity (data)',
+    target: 'return {data};',
+    replacement: 'return CompactValue{data};'
+  }
+]);
 
 console.log('✨ Infrastructure modernization complete.');
