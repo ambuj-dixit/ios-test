@@ -1,6 +1,6 @@
 workflows:
   ios-preview:
-    name: ESIM Campus Professional iOS Build
+    name: ESIM Campus Ultimate Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -11,26 +11,24 @@ workflows:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
         XCODE_SCHEME: "Esimcampus"
     scripts:
-      - name: Environment Cleanup & Install
+      - name: Environment Setup
         script: |
-          echo "Cleaning environment..."
+          echo "Clearing caches and installing dependencies..."
           rm -rf node_modules ios/Pods ios/build
           npm install --legacy-peer-deps
           
-      - name: Professional Patching
+      - name: Surgical Dependency Patching
         script: |
-          echo "Applying surgical patches..."
           node scripts/patch-ios-dependencies.js
 
-      - name: CocoaPods Installation
+      - name: CocoaPods Install
         script: |
-          echo "Installing CocoaPods..."
           cd ios && pod install --repo-update
 
-      - name: Build & Archive iOS
+      - name: Ultimate Build & Archive
         script: |
-          echo "Building application..."
-          # The Podfile now handles all complex build settings automatically
+          echo "Starting Ultimate Archive Process..."
+          # We use the workspace and scheme configured via Podfile
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -40,7 +38,8 @@ workflows:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            GCC_WARN_INHIBIT_ALL_WARNINGS=YES
 
           echo "Packaging IPA..."
           mkdir -p build/ios/ipa
@@ -51,7 +50,9 @@ workflows:
             zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
             echo "✅ Build Successful."
           else
-            echo "❌ Build Failed: App binary not found."
+            echo "❌ BUILD FAILED: App binary not found in archive."
+            # Debug: List what WAS generated
+            find build/Esimcampus.xcarchive -name "*.app"
             exit 1
           fi
     artifacts:

@@ -7,45 +7,41 @@ use_modular_headers!
 
 prepare_react_native_project!
 
-# 🚀 WORLD-CLASS CONFIGURATION FOR REACT NATIVE 0.72+
-# Static frameworks are essential for Firebase and OneSignal in modern RN
+# 🚀 NUCLEAR STABILITY CONFIGURATION
+# Static frameworks are mandatory for modern Firebase/OneSignal
 $RNFirebaseAsStaticFramework = true
 use_frameworks! :linkage => :static
 
 global_config = use_native_modules!
 
-# Professional Build Settings Function
 def apply_professional_settings(config, is_extension = false)
-  # 1. Base Consistency
+  # 1. Base Consistency & Modern Linker
   config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
   config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
   config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
   config.build_settings['DEFINES_MODULE'] = 'YES'
   config.build_settings['USE_HEADERMAP'] = 'NO'
 
-  # 2. CI Stability & Silence Warnings
-  config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-  config.build_settings['RUN_CLANG_STATIC_ANALYZER'] = 'NO'
-  config.build_settings['COPY_PHASE_STRIP'] = 'NO'
-
-  # 3. New Linker Workaround (Xcode 15+)
+  # 2. Xcode 15+ Linker Fix
   config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
   config.build_settings['OTHER_LDFLAGS'] << '-Wl,-ld_classic'
 
-  # 4. React Native 0.72+ C++ Compatibility
+  # 3. Suppress Warnings for CI
+  config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+  config.build_settings['RUN_CLANG_STATIC_ANALYZER'] = 'NO'
+
+  # 4. React Native 0.72+ C++ & Macro Fixes
   config.build_settings['OTHER_CPLUSPLUSFLAGS'] ||= ['$(inherited)']
   config.build_settings['OTHER_CPLUSPLUSFLAGS'] << '-w' << '-fpermissive' << '-Wno-everything' << '-D_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS=1'
 
   config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
   config.build_settings['OTHER_CFLAGS'] << '-w' << '-fpermissive' << '-Wno-everything'
 
-  # 5. UIControlEventValueChanged Casting Macro
   defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
   defs << 'UIControlEventValueChanged=(UIControlEvents)UIControlEventValueChanged'
-  config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs.uniq
+  config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = def_uniq = defs.uniq
 
-  # 6. CRITICAL: Application Extension API Compliance
-  # Main App = NO, Extensions = YES. All libraries linked to extension must be YES.
+  # 5. Extension API Compliance
   config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = is_extension ? 'YES' : 'NO'
 end
 
@@ -65,13 +61,13 @@ target 'Esimcampus' do
 end
 
 target 'OneSignalNotificationServiceExtension' do
-  # Linker: Static linkage for extension dependencies
+  # No use_react_native! here to prevent linking against React in the extension
   use_frameworks! :linkage => :static
   pod 'OneSignalXCFramework', '3.12.10'
 end
 
 post_install do |installer|
-  # 1. Privacy Manifest Bypass (CocoaPods 1.15+ issue)
+  # 1. Privacy Manifest Bypass
   if defined?(PrivacyManifestUtils)
     PrivacyManifestUtils.singleton_class.define_method(:add_aggregated_privacy_manifest) do |_installer|
     end
@@ -84,19 +80,25 @@ post_install do |installer|
     :mac_catalyst_enabled => false
   )
 
-  # 3. Iterate through all Pod targets
+  # 3. Resolve Duplicate Output Files & Linker Ambiguity
   installer.pods_project.targets.each do |target|
-    # Determine if this pod is used by the extension
-    is_extension_pod = target.name.include?('OneSignal') || target.name.include?('NotificationService')
+    # Fix for React-Core duplication in RN 0.72
+    if target.name.include?('React-Core.common-CoreModulesHeaders')
+      target.build_configurations.each do |config|
+        config.build_settings['PRODUCT_NAME'] = "React_Core_Headers_#{target.name.hash.abs}"
+        config.build_settings['SKIP_INSTALL'] = 'YES'
+      end
+    end
+
+    # Determine if pod is used by extension
+    is_ext_pod = target.name.include?('OneSignal') || target.name.include?('NotificationService')
 
     target.build_configurations.each do |config|
-      apply_professional_settings(config, is_extension_pod)
-
-      # CI Fix: Disable code-signing for pods
+      apply_professional_settings(config, is_ext_pod)
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
     end
 
-    # Fix for AccessibilityResources duplicate bundle
+    # Bundle collision fix
     if target.name.include?('AccessibilityResources')
       target.build_configurations.each do |config|
         config.build_settings['PRODUCT_NAME'] = "Res_#{target.name.gsub(/[^0-9a-z]/i, '_')}"
@@ -104,21 +106,26 @@ post_install do |installer|
     end
   end
 
-  # 4. Enforce settings on Main Project Targets
+  # 4. Final Project Sync (Main App & Extension)
   installer.aggregate_targets.each do |aggregate_target|
     aggregate_target.user_project.targets.each do |target|
       is_ext = target.name.include?('Extension')
       target.build_configurations.each do |config|
         apply_professional_settings(config, is_ext)
 
-        # Additional Linker Ambiguity Fix for Extensions
+        # Aggressive removal of React from Extension Linker
         if is_ext
-           # Remove implicit React framework linking if it causes ambiguity
            ld_flags = config.build_settings['OTHER_LDFLAGS'] || []
-           if ld_flags.include?('-framework "React"') || ld_flags.include?('-framework React')
-             config.build_settings['OTHER_LDFLAGS'].delete('-framework "React"')
-             config.build_settings['OTHER_LDFLAGS'].delete('-framework React')
-           end
+           config.build_settings['OTHER_LDFLAGS'] = ld_flags.reject { |flag| flag.include?('React') }
+        end
+      end
+
+      # Remove problematic build phases from Extension
+      if is_ext
+        target.build_phases.each do |phase|
+          if phase.respond_to?(:name) && (phase.name.include?('Start Packager') || phase.name.include?('Bundle React Native'))
+            target.build_phases.delete(phase)
+          end
         end
       end
     end
