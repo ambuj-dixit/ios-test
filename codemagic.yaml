@@ -1,6 +1,6 @@
 workflows:
-  ios-preview:
-    name: ESIM Campus Ultimate Build
+  ios-professional:
+    name: ESIM Campus Production-Grade iOS Build
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
@@ -10,25 +10,31 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/Esimcampus.xcworkspace"
         XCODE_SCHEME: "Esimcampus"
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - node_modules
+        - ios/Pods
     scripts:
-      - name: Environment Setup
+      - name: Dependency Installation
         script: |
-          echo "Clearing caches and installing dependencies..."
-          rm -rf node_modules ios/Pods ios/build
+          echo "Syncing dependencies..."
           npm install --legacy-peer-deps
           
-      - name: Surgical Dependency Patching
+      - name: iOS Optimization Patches
         script: |
+          echo "Applying architectural optimizations..."
           node scripts/patch-ios-dependencies.js
 
-      - name: CocoaPods Install
+      - name: CocoaPods Synchronization
         script: |
+          echo "Synchronizing native dependencies..."
           cd ios && pod install --repo-update
 
-      - name: Ultimate Build & Archive
+      - name: Production Archive
         script: |
-          echo "Starting Ultimate Archive Process..."
-          # We use the workspace and scheme configured via Podfile
+          echo "Starting professional archive process..."
+          # Build settings are managed in Podfile for maximum consistency
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -39,20 +45,19 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            GCC_WARN_INHIBIT_ALL_WARNINGS=YES
+            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
 
-          echo "Packaging IPA..."
+          echo "IPA Packaging..."
           mkdir -p build/ios/ipa
-          if [ -d "build/Esimcampus.xcarchive/Products/Applications/Esimcampus.app" ]; then
-            cd build/Esimcampus.xcarchive/Products/Applications
+          APP_PATH=$(find build/Esimcampus.xcarchive -name "*.app" | head -n 1)
+          if [ -d "$APP_PATH" ]; then
+            cd $(dirname "$APP_PATH")
             mkdir Payload
-            cp -r Esimcampus.app Payload/
-            zip -r ../../../ios/ipa/Esimcampus_Preview.ipa Payload
-            echo "✅ Build Successful."
+            cp -r $(basename "$APP_PATH") Payload/
+            zip -r ../../../ios/ipa/Esimcampus_Production.ipa Payload
+            echo "✅ Production IPA generated."
           else
-            echo "❌ BUILD FAILED: App binary not found in archive."
-            # Debug: List what WAS generated
-            find build/Esimcampus.xcarchive -name "*.app"
+            echo "❌ ERROR: Application binary was not found in archive."
             exit 1
           fi
     artifacts:

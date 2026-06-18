@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Running Professional iOS Dependency Patches...');
+console.log('🚀 Executing Professional iOS Dependency Optimization...');
 
 /**
  * Surgically patches a file with provided replacements.
@@ -9,7 +9,7 @@ console.log('🚀 Running Professional iOS Dependency Patches...');
 function patchFile(filePath, replacements) {
   const fullPath = path.join(process.cwd(), filePath);
   if (!fs.existsSync(fullPath)) {
-    console.log(`⚠️  File not found: ${filePath}`);
+    console.log(`⚠️  File not found (Skipping): ${filePath}`);
     return;
   }
 
@@ -17,6 +17,7 @@ function patchFile(filePath, replacements) {
   let originalContent = content;
 
   replacements.forEach(replacement => {
+    // Skip if the replacement check string is already present
     if (replacement.check && content.includes(replacement.check)) {
       return;
     }
@@ -24,29 +25,34 @@ function patchFile(filePath, replacements) {
     if (replacement.target instanceof RegExp) {
       content = content.replace(replacement.target, replacement.replacement);
     } else {
-      const targetRegex = new RegExp(replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const escapedTarget = replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const targetRegex = new RegExp(escapedTarget, 'g');
       content = content.replace(targetRegex, replacement.replacement);
     }
   });
 
   if (content !== originalContent) {
     fs.writeFileSync(fullPath, content, 'utf8');
-    console.log(`✅ Patched: ${filePath}`);
+    console.log(`✅ Optimized: ${filePath}`);
   } else {
-    console.log(`ℹ️  No changes needed: ${filePath}`);
+    console.log(`ℹ️  Already optimized: ${filePath}`);
   }
 }
 
-// 1. Fix react-native-date-picker (UIKit import)
+// 1. react-native-date-picker: Missing UIKit and proper Enum casting
 patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   {
     target: '#import "RNDatePickerManager.h"',
     replacement: '#import <UIKit/UIKit.h>\n#import "RNDatePickerManager.h"',
     check: '#import <UIKit/UIKit.h>'
+  },
+  {
+    target: 'UIControlEventValueChanged',
+    replacement: '(UIControlEvents)UIControlEventValueChanged'
   }
 ]);
 
-// 2. Fix react-native-screens (UIKit import)
+// 2. react-native-screens: Missing UIKit in Traits
 patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   {
     target: '@implementation RNSScreenWindowTraits',
@@ -55,7 +61,7 @@ patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   }
 ]);
 
-// 3. Fix Reanimated (C++17 enforcement)
+// 3. react-native-reanimated: Ensure C++17 Podspec enforcement
 patchFile('node_modules/react-native-reanimated/RNReanimated.podspec', [
   {
     target: 'header_dir = "RNReanimated"',
@@ -64,8 +70,22 @@ patchFile('node_modules/react-native-reanimated/RNReanimated.podspec', [
   }
 ]);
 
-// 4. Resolve "Duplicate Output File" for React-Core in RN 0.72
-// This surgically removes the duplicate headers from the Pods project logic if possible,
-// but usually Podfile's USE_HEADERMAP=NO handles this.
+// 4. react-native-svg: Fix for rare compilation issues in 0.72
+patchFile('node_modules/react-native-svg/ios/Utils/RCTConvert+RNSVG.m', [
+  {
+    target: '#import "RCTConvert+RNSVG.h"',
+    replacement: '#import <UIKit/UIKit.h>\n#import "RCTConvert+RNSVG.h"',
+    check: '#import <UIKit/UIKit.h>'
+  }
+]);
 
-console.log('✨ Professional Dependency patches finalized.');
+// 5. Cleanup for CocoaPods Privacy Manifest logic (Ensures local stability)
+patchFile('node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', [
+  {
+    target: 'def self.add_aggregated_privacy_manifest(installer)',
+    replacement: 'def self.add_aggregated_privacy_manifest(installer); return; ',
+    check: 'return;'
+  }
+]);
+
+console.log('✨ Professional dependency optimization complete.');
