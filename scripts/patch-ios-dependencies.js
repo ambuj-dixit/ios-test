@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Executing Surgical iOS Dependency Optimization (v5)...');
+console.log('🚀 Executing Professional iOS Dependency Optimization (v6)...');
 
 /**
  * Surgically patches a file with provided replacements.
@@ -33,11 +33,17 @@ function patchFile(filePath, replacements) {
 }
 
 // 1. Fix Yoga.podspec - Correct Ruby comment and aggressively remove Werror
+// We use a broader match to ensure it catches variations in whitespace
 patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
   {
     target: "'-Werror',",
     replacement: "# '-Werror',",
     check: "# '-Werror',"
+  },
+  {
+    target: "'-Wall',",
+    replacement: "# '-Wall',",
+    check: "# '-Wall',"
   }
 ]);
 
@@ -64,30 +70,27 @@ patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
 ]);
 
 // 4. NUCLEAR PRAGMA INJECTION: Yoga Source Files
-// Injects pragmas directly into source files to kill all warnings and modular header issues.
-const yogaFiles = [
-  'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGStyle.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGEnums.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGConfig.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/Utils.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGValue.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGNodePrint.cpp',
-  'node_modules/react-native/ReactCommon/yoga/yoga/YGLayout.cpp'
-];
-
-yogaFiles.forEach(file => {
-  const fullPath = path.join(process.cwd(), file);
-  if (fs.existsSync(fullPath)) {
-    let content = fs.readFileSync(fullPath, 'utf8');
-    if (!content.includes('pragma clang diagnostic ignored "-Weverything"')) {
-      // Add the pragma at the very top, before any includes
-      content = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n' + content + '\n#pragma clang diagnostic pop';
-      fs.writeFileSync(fullPath, content, 'utf8');
-      console.log(`☢️  Nuclear Pragma applied to source: ${file}`);
-    }
-  }
-});
+// We use a recursive search to find every Yoga file regardless of internal structure changes
+const yogaRoot = path.join(process.cwd(), 'node_modules/react-native/ReactCommon/yoga/yoga');
+if (fs.existsSync(yogaRoot)) {
+    const patchYogaSource = (dir) => {
+        const files = fs.readdirSync(dir);
+        files.forEach(file => {
+            const fullPath = path.join(dir, file);
+            if (fs.statSync(fullPath).isDirectory()) {
+                patchYogaSource(fullPath);
+            } else if (file.endsWith('.cpp') || file.endsWith('.h')) {
+                let content = fs.readFileSync(fullPath, 'utf8');
+                if (!content.includes('pragma clang diagnostic ignored "-Weverything"')) {
+                    // Inject at the absolute top
+                    const nuclearPragma = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n';
+                    fs.writeFileSync(fullPath, nuclearPragma + content + '\n#pragma clang diagnostic pop', 'utf8');
+                    console.log(`☢️  Nuclear Pragma applied: ${file}`);
+                }
+            }
+        });
+    };
+    patchYogaSource(yogaRoot);
+}
 
 console.log('✨ Dependency optimization complete.');
