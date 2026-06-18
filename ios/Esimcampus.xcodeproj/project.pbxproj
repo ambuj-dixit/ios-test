@@ -17,7 +17,6 @@
 		EB77F55770A8177227E75FC4 /* libPods-OneSignalNotificationServiceExtension.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 63B016E8660B93AE0165D0F6 /* libPods-OneSignalNotificationServiceExtension.a */; };
 		FAB5ED112DD364CA005E85A9 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB5ED102DD364CA005E85A9 /* NotificationService.swift */; };
 		FAB5ED152DD364CA005E85A9 /* OneSignalNotificationServiceExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = FAB5ED0E2DD364CA005E85A9 /* OneSignalNotificationServiceExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		FABD7BFF2DD3790800288D6B /* LaunchScreen.storyboard.xml in Sources */ = {isa = PBXBuildFile; fileRef = FABD7BFD2DD378F400288D6B /* LaunchScreen.storyboard.xml */; };
 		FABD7C012DD3799A00288D6B /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = FABD7C002DD3799A00288D6B /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
 
@@ -79,7 +78,6 @@
 		FAB5ED0E2DD364CA005E85A9 /* OneSignalNotificationServiceExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OneSignalNotificationServiceExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAB5ED102DD364CA005E85A9 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		FAB5ED122DD364CA005E85A9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		FABD7BFD2DD378F400288D6B /* LaunchScreen.storyboard.xml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; name = LaunchScreen.storyboard.xml; path = Esimcampus/LaunchScreen.storyboard.xml; sourceTree = "<group>"; };
 		FABD7C002DD3799A00288D6B /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Esimcampus/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		FFD3F526150070AC26865DCC /* Pods-Esimcampus-EsimcampusTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Esimcampus-EsimcampusTests.release.xcconfig"; path = "Target Support Files/Pods-Esimcampus-EsimcampusTests/Pods-Esimcampus-EsimcampusTests.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -133,7 +131,6 @@
 			isa = PBXGroup;
 			children = (
 				FABD7C002DD3799A00288D6B /* LaunchScreen.storyboard */,
-				FABD7BFD2DD378F400288D6B /* LaunchScreen.storyboard.xml */,
 				82F4AD4F2BC42E47006E88DE /* Esimcampus.entitlements */,
 				13B07FAF1A68108700A75B9A /* AppDelegate.h */,
 				13B07FB01A68108700A75B9A /* AppDelegate.mm */,
@@ -570,7 +567,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FABD7BFF2DD3790800288D6B /* LaunchScreen.storyboard.xml in Sources */,
 				13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */,
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 			);
