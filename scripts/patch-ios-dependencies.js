@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Running Surgical iOS Dependency Patches...');
+console.log('🚀 Running World-Class iOS Dependency Patches...');
 
 function patchFile(filePath, replacements) {
   const fullPath = path.join(process.cwd(), filePath);
@@ -15,20 +15,22 @@ function patchFile(filePath, replacements) {
 
   replacements.forEach(replacement => {
     if (replacement.check && content.includes(replacement.check)) {
-        return; // Already patched
+        return;
     }
-    content = content.split(replacement.target).join(replacement.replacement);
+    // Use regex to be more flexible with whitespace
+    const targetRegex = new RegExp(replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    content = content.replace(targetRegex, replacement.replacement);
   });
 
   if (content !== originalContent) {
     fs.writeFileSync(fullPath, content, 'utf8');
     console.log(`✅ Patched: ${filePath}`);
   } else {
-    console.log(`ℹ️  No changes needed for: ${filePath}`);
+    console.log(`ℹ️  No changes needed or already patched: ${filePath}`);
   }
 }
 
-// 1. Fix react-native-date-picker (Missing UIKit and UIControlEvents cast)
+// 1. Fix react-native-date-picker
 patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   {
     target: '#import "RNDatePickerManager.h"',
@@ -38,23 +40,19 @@ patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
   {
     target: 'UIControlEventValueChanged',
     replacement: '(UIControlEvents)UIControlEventValueChanged'
-  },
-  {
-    target: '(UIControlEvents)(UIControlEvents)', // Cleanup if already patched
-    replacement: '(UIControlEvents)'
   }
 ]);
 
-// 2. Fix react-native-screens (RNSScreenWindowTraits.mm - missing UIKit for orientation traits)
+// 2. Fix react-native-screens (Ensuring UIKit is present in WindowTraits)
 patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
   {
-    target: '#import "RNSScreenWindowTraits.h"',
-    replacement: '#import <UIKit/UIKit.h>\n#import "RNSScreenWindowTraits.h"',
+    target: '@implementation RNSScreenWindowTraits',
+    replacement: '#import <UIKit/UIKit.h>\n\n@implementation RNSScreenWindowTraits',
     check: '#import <UIKit/UIKit.h>'
   }
 ]);
 
-// 3. Fix CocoaPods Privacy Script in React Native 0.72 (Crashes pod install)
+// 3. Fix CocoaPods Privacy Script
 patchFile('node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb', [
   {
     target: 'def self.add_aggregated_privacy_manifest(installer)',
@@ -63,4 +61,4 @@ patchFile('node_modules/react-native/scripts/cocoapods/privacy_manifest_utils.rb
   }
 ]);
 
-console.log('✨ All iOS patches applied successfully.');
+console.log('✨ Dependency patches finalized.');
