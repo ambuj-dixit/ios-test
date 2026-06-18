@@ -1,57 +1,78 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🚀 Final Nuclear Patching sequence starting...');
+console.log('🚀 Running Professional iOS Dependency Patches...');
 
-// Deep search for files because path structures vary on CI
-function findAndPatch(fileName, targetStr, replacementStr) {
-    const root = process.cwd();
-    const search = (dir) => {
-        const files = fs.readdirSync(dir);
-        for (const file of files) {
-            const fullPath = path.join(dir, file);
-            if (fs.statSync(fullPath).isDirectory()) {
-                if (file !== 'ios' && file !== 'android' && file !== '.git') search(fullPath);
-            } else if (file === fileName) {
-                let content = fs.readFileSync(fullPath, 'utf8');
-                if (content.includes(targetStr)) {
-                    fs.writeFileSync(fullPath, content.replace(new RegExp(targetStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), replacementStr));
-                    console.log(`✅ Patched: ${fullPath}`);
-                }
-            }
-        }
-    };
-    search(root);
+function patchFile(filePath, replacements) {
+  const fullPath = path.join(process.cwd(), filePath);
+  if (!fs.existsSync(fullPath)) {
+    console.log(`⚠️  File not found: ${filePath}`);
+    return;
+  }
+
+  let content = fs.readFileSync(fullPath, 'utf8');
+  let originalContent = content;
+
+  replacements.forEach(replacement => {
+    if (replacement.check && content.includes(replacement.check)) {
+      return;
+    }
+    const targetRegex = new RegExp(replacement.target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    content = content.replace(targetRegex, replacement.replacement);
+  });
+
+  if (content !== originalContent) {
+    fs.writeFileSync(fullPath, content, 'utf8');
+    console.log(`✅ Patched: ${filePath}`);
+  }
 }
 
-// 1. Force Yoga to ignore ALL warnings at the source level
-const yogaFiles = ['Yoga.cpp', 'YGNode.cpp', 'YGStyle.cpp', 'YGEnums.cpp', 'YGConfig.cpp', 'Utils.cpp'];
-const pragmaStart = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n';
-const pragmaEnd = '\n#pragma clang diagnostic pop';
+// 1. Fix Yoga.podspec (Remove -Werror)
+patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
+  {
+    target: "'-Werror',",
+    replacement: "// '-Werror',"
+  }
+]);
 
-yogaFiles.forEach(file => {
-    findAndPatch(file, '#include', pragmaStart + '#include');
-    // Ensure the end is appended
-    const root = process.cwd();
-    const searchAndAppend = (dir) => {
-        const files = fs.readdirSync(dir);
-        for (const f of files) {
-            const p = path.join(dir, f);
-            if (fs.statSync(p).isDirectory()) {
-                if (f !== 'ios' && f !== 'android' && f !== '.git') searchAndAppend(p);
-            } else if (f === file) {
-                let content = fs.readFileSync(p, 'utf8');
-                if (!content.includes('pragma clang diagnostic pop')) {
-                    fs.writeFileSync(p, content + pragmaEnd);
-                }
-            }
-        }
-    };
-    searchAndAppend(root);
+// 2. Fix react-native-date-picker
+patchFile('node_modules/react-native-date-picker/ios/RNDatePickerManager.mm', [
+  {
+    target: '#import "RNDatePickerManager.h"',
+    replacement: '#import <UIKit/UIKit.h>\n#import "RNDatePickerManager.h"',
+    check: '#import <UIKit/UIKit.h>'
+  }
+]);
+
+// 3. Fix react-native-screens
+patchFile('node_modules/react-native-screens/ios/RNSScreenWindowTraits.mm', [
+  {
+    target: '@implementation RNSScreenWindowTraits',
+    replacement: '#import <UIKit/UIKit.h>\n\n@implementation RNSScreenWindowTraits',
+    check: '#import <UIKit/UIKit.h>'
+  }
+]);
+
+// 4. Nuclear Pragma for Yoga Source (Double protection)
+const yogaSourceFiles = [
+  'node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGNode.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGStyle.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGEnums.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/YGConfig.cpp',
+  'node_modules/react-native/ReactCommon/yoga/yoga/Utils.cpp'
+];
+
+yogaSourceFiles.forEach(file => {
+  const fullPath = path.join(process.cwd(), file);
+  if (fs.existsSync(fullPath)) {
+    let content = fs.readFileSync(fullPath, 'utf8');
+    if (!content.includes('pragma clang diagnostic ignored "-Weverything"')) {
+      content = '#pragma clang diagnostic push\n#pragma clang diagnostic ignored "-Weverything"\n' + content + '\n#pragma clang diagnostic pop';
+      fs.writeFileSync(fullPath, content, 'utf8');
+      console.log(`☢️  Nuclear Pragma applied: ${file}`);
+    }
+  }
 });
 
-// 2. Fix other known library issues
-findAndPatch('RNDatePickerManager.mm', '#import "RNDatePickerManager.h"', '#import <UIKit/UIKit.h>\n#import "RNDatePickerManager.h"');
-findAndPatch('RNSScreenWindowTraits.mm', '@implementation RNSScreenWindowTraits', '#import <UIKit/UIKit.h>\n@implementation RNSScreenWindowTraits');
-
-console.log('✨ Absolute final patches applied.');
+console.log('✨ Dependency patches finalized.');

@@ -21,7 +21,6 @@ workflows:
         script: cd ios && pod install --repo-update
       - name: Build
         script: |
-          # The absolute final suppression flags
           xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
@@ -31,10 +30,7 @@ workflows:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            WARNING_CFLAGS="-w" \
-            GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
-            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
-            OTHER_LDFLAGS='$(inherited) -Wl,-ld_classic'
+            COMPILER_INDEX_STORE_ENABLE=NO
           
           mkdir -p build/ios/ipa
           APP=$(find build/Esimcampus.xcarchive -name "*.app" | head -n 1)
@@ -43,6 +39,7 @@ workflows:
             mkdir Payload && cp -r $(basename "$APP") Payload/
             zip -r ../../../ios/ipa/Esimcampus.ipa Payload
           else
+            echo "CRITICAL: App binary not found in archive."
             exit 1
           fi
     artifacts:
