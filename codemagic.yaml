@@ -14,7 +14,9 @@ workflows:
       - name: Prep
         script: |
           echo "Preparing Environment..."
-          # Prevent Yarn from searching parent directories for workspaces
+          # Clean stale artifacts
+          rm -rf node_modules ios/Pods ios/Podfile.lock ios/build package-lock.json
+          # Ensure Yarn project boundary
           touch yarn.lock
           yarn install
       - name: Nuclear Patch
