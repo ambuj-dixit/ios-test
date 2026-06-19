@@ -107,6 +107,8 @@ post_install do |installer|
 
     target.build_configurations.each do |config|
       apply_professional_settings(config, is_ext_pod)
+      config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+      config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
     end
 
     # TARGET SPECIFIC DE-CONFLICTION
