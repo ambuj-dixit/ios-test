@@ -14,8 +14,9 @@ workflows:
       - name: Prep
         script: |
           echo "Cleaning environment and installing dependencies..."
-          rm -rf node_modules ios/Pods ios/build yarn.lock
-          yarn install --ignore-engines
+          # Keep yarn.lock if it exists for faster and more consistent builds
+          rm -rf node_modules ios/Pods ios/build
+          yarn install
       - name: Nuclear Patch
         script: |
           echo "Executing Surgical Dependency Fixes..."
