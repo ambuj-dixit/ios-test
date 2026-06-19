@@ -90,4 +90,18 @@ patchFile('node_modules/react-native/ReactCommon/yoga/yoga/Yoga.cpp', [
   }
 ]);
 
+// 5. Patch Yoga.podspec to remove -Werror and -Wall which block modern Clang
+patchFile('node_modules/react-native/ReactCommon/yoga/Yoga.podspec', [
+  {
+    description: 'Remove restrictive compiler flags',
+    target: "'-Wall',",
+    replacement: "'-w',"
+  },
+  {
+    description: 'Remove -Werror',
+    target: "'-Werror',",
+    replacement: ""
+  }
+]);
+
 console.log('✨ Infrastructure modernization complete.');
