@@ -131,6 +131,8 @@ post_install do |installer|
         config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
         config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/fmt/include"'
         config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_TARGET_SRCROOT)/include"'
+        config.build_settings['USE_HEADERMAP'] = 'NO'
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
       end
     end
 
