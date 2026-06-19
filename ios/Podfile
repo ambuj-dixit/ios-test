@@ -132,6 +132,14 @@ post_install do |installer|
       end
     end
 
+    # RCT-Folly: Fix header search paths
+    if target.name == 'RCT-Folly'
+      target.build_configurations.each do |config|
+        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+        config.build_settings['HEADER_SEARCH_PATHS'] << '"$(PODS_ROOT)/Headers/Public/RCT-Folly"'
+      end
+    end
+
     # fmt: Ensure compatibility
     if target.name == 'fmt'
       target.build_configurations.each do |config|
