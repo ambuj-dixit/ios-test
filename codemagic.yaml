@@ -14,8 +14,8 @@ workflows:
       - name: Prep
         script: |
           echo "Cleaning environment and installing dependencies..."
-          rm -rf node_modules ios/Pods ios/build
-          npm install --legacy-peer-deps
+          rm -rf node_modules ios/Pods ios/build yarn.lock
+          yarn install --ignore-engines
       - name: Nuclear Patch
         script: |
           echo "Executing Surgical Dependency Fixes..."
@@ -39,6 +39,7 @@ workflows:
             COMPILER_INDEX_STORE_ENABLE=NO \
             GCC_WARN_INHIBIT_ALL_WARNINGS=YES \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
+            CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES=YES \
             WARNING_CFLAGS="-w"
           
           echo "Packaging IPA..."
